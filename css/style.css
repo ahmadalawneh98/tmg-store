@@ -458,3 +458,23 @@
   ::-webkit-scrollbar-thumb:hover{
     background:linear-gradient(180deg, var(--brand2), var(--brand3));
   }
+
+
+
+  /* اجبر رمز العملة يبان داخل بطاقة السعر */
+.price .sym{
+  background: none !important;
+  -webkit-text-fill-color: currentColor !important;
+  color: var(--text) !important;
+  opacity: 1 !important;
+}
+
+
+#curx-badge .curx-sym{
+  background: none !important;
+  -webkit-text-fill-color: #111 !important;
+  color: #111 !important;
+  opacity: 1 !important;
+  mix-blend-mode: normal !important;
+  text-shadow: none !important;
+}
