@@ -22,7 +22,8 @@ function attachTilt(root=document){
       const r = card.getBoundingClientRect();
       const px = (e.clientX - r.left)/r.width - .5;
       const py = (e.clientY - r.top)/r.height - .5;
-      card.style.transform = `perspective(1000px) rotateX(${py*strength}deg) rotateY(${-px*strength}deg) translateZ(20px)`;
+      card.style.transform =
+        `perspective(1000px) rotateX(${py*strength}deg) rotateY(${-px*strength}deg) translateZ(20px)`;
     };
     const leave = ()=>{ card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) translateZ(0)'; };
     card.addEventListener('mousemove', e=>{ cancelAnimationFrame(raf); raf=requestAnimationFrame(()=>move(e)); });
@@ -37,9 +38,9 @@ let W,H,dpr,parts=[];
 
 function resize(){
   dpr = Math.min(2, window.devicePixelRatio || 1);
-  W = c.width = innerWidth * dpr; 
+  W = c.width = innerWidth * dpr;
   H = c.height = innerHeight * dpr;
-  c.style.width = innerWidth+'px'; 
+  c.style.width = innerWidth+'px';
   c.style.height = innerHeight+'px';
   const n = Math.min(100, Math.floor(innerWidth/10));
   parts = Array.from({length:n}, ()=>({
@@ -101,11 +102,14 @@ function renderProducts(items=[]){
 (async ()=>{
   try{
     const data = await fetchTopCategories();
-    // غيّر الماب حسب شكل الاستجابة الفعلي
-    const items = (data?.data ?? data?.results ?? data)?.map(c => ({
-      name: c.name ?? c.title ?? 'Category',
-      image: c.image ?? c.thumbnail ?? c.icon ?? '',
-    })) ?? [];
+    // حسب الوثائق: الكائن يحتوي (thumb, name, slug, ...).
+    // بعض البيئات قد ترجع المصفوفة مباشرة أو تحت data.
+    const raw = Array.isArray(data) ? data : (data?.data ?? []);
+    const items = raw.map(c => ({
+      name: c?.name ?? 'Category',
+      image: c?.thumb ?? '',       // ← الصورة الصحيحة من الوثائق
+      slug:  c?.slug ?? null
+    }));
     renderCategories(items);
   }catch(err){
     console.error('Failed to load categories:', err);

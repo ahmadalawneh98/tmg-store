@@ -1,3 +1,4 @@
+// /api/categories.js
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -7,17 +8,22 @@ export default async function handler(req, res) {
   }
 
   const API_BASE = 'https://api.easy-orders.net/api/v1/external-apps/categories/';
-  const API_KEY = process.env.EASY_ORDERS_API_KEY; // ← المهم
+  const API_KEY = process.env.EASY_ORDERS_API_KEY;
 
-  const { filters } = req.query;
+  const { filter } = req.query; // NOTE: اسم الباراميتر filter
   const url = new URL(API_BASE);
-  if (Array.isArray(filters)) filters.forEach(f => url.searchParams.append('filter', f));
-  else if (typeof filters === 'string') url.searchParams.append('filter', filters);
+
+  // ادعم تكرار filter
+  if (Array.isArray(filter)) {
+    filter.forEach(f => url.searchParams.append('filter', f));
+  } else if (typeof filter === 'string') {
+    url.searchParams.append('filter', filter);
+  }
 
   try {
     const r = await fetch(url.toString(), {
       headers: {
-        'Authorization': `Bearer ${API_KEY}`,
+        'Api-Key': API_KEY,                 // ← مهم
         'Accept': 'application/json'
       }
     });

@@ -1,5 +1,5 @@
 // scripts/api.js
-const proxy = '/api/categories'; // وظيفة Vercel
+const proxy = '/api/categories';
 
 function encodeFilters(arr){
   return arr.map(([f,op,val]) =>
@@ -9,8 +9,9 @@ function encodeFilters(arr){
 
 export async function fetchTopCategories(){
   const url = new URL(proxy, location.origin);
+  // parent_id is null AND hidden == false
   encodeFilters([['parent_id','isnull'], ['hidden','eq','false']])
-    .forEach(f => url.searchParams.append('filters', f));
+    .forEach(f => url.searchParams.append('filter', f)); // ← filter
   const r = await fetch(url);
   if (!r.ok) throw new Error(await r.text());
   return r.json();
