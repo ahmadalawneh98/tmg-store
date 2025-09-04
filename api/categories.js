@@ -1,4 +1,3 @@
-
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -8,14 +7,12 @@ export default async function handler(req, res) {
   }
 
   const API_BASE = 'https://api.easy-orders.net/api/v1/external-apps/categories/';
-  const { filters } = req.query;
+  const API_KEY = process.env.EASY_ORDERS_API_KEY; // ← المهم
 
+  const { filters } = req.query;
   const url = new URL(API_BASE);
-  if (Array.isArray(filters)) {
-    filters.forEach(f => url.searchParams.append('filter', f));
-  } else if (typeof filters === 'string') {
-    url.searchParams.append('filter', filters);
-  }
+  if (Array.isArray(filters)) filters.forEach(f => url.searchParams.append('filter', f));
+  else if (typeof filters === 'string') url.searchParams.append('filter', filters);
 
   try {
     const r = await fetch(url.toString(), {
