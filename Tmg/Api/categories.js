@@ -1,5 +1,3 @@
-// /api/categories.js  (TEMP ONLY - not secure)
-const API_KEY = 'c27632d4-d811-40a7-bbaa-bc41ad1f98d2';
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
