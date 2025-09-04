@@ -1,5 +1,5 @@
 // scripts/app.js
-import { fetchTopCategories } from './api.js';
+// import { fetchTopCategories } from './api.js'; // ⛔️ مؤقتًا معطّل (سنفعّله لاحقًا)
 
 /* ========= Year ========= */
 document.getElementById('y').textContent = new Date().getFullYear();
@@ -43,7 +43,7 @@ function resize(){
   c.style.width = innerWidth+'px';
   c.style.height = innerHeight+'px';
   const n = Math.min(100, Math.floor(innerWidth/10));
-  parts = Array.from({length:n}, ()=>({
+  parts = Array.from({length:n}, () => ({
     x: Math.random()*W, y: Math.random()*H,
     r: Math.random()*3+1, s: Math.random()*1.5+.3,
     a: Math.random()*Math.PI*2, color: Math.random()>0.7?'brand2':'brand',
@@ -98,20 +98,25 @@ function renderProducts(items=[]){
   attachTilt(grid);
 }
 
-/* ========= Boot ========= */
+/* ========= Boot (Demo Mode: no API calls) ========= */
 (async ()=>{
   try{
-    const data = await fetchTopCategories();
-    // حسب الوثائق: الكائن يحتوي (thumb, name, slug, ...).
-    // بعض البيئات قد ترجع المصفوفة مباشرة أو تحت data.
-    const raw = Array.isArray(data) ? data : (data?.data ?? []);
-    const items = raw.map(c => ({
-      name: c?.name ?? 'Category',
-      image: c?.thumb ?? '',       // ← الصورة الصحيحة من الوثائق
-      slug:  c?.slug ?? null
-    }));
-    renderCategories(items);
+    // ✅ بيانات ثابتة مؤقتًا بدل EasyOrders API
+    const demoCategories = [
+      { name: 'Call of Duty',   image: '/Images/cod.png',               slug: 'call-of-duty' },
+      { name: 'PUBG',           image: '/Images/pubg.png',              slug: 'pubg' },
+      { name: 'Clash of Clans', image: '/Images/clash-of-clans.png',   slug: 'clash-of-clans' },
+      { name: 'Roblox',         image: '/Images/roblox.png',            slug: 'roblox' },
+    ];
+    renderCategories(demoCategories);
+
+    // ⏮️ لإعادة التفعيل لاحقًا:
+    // const data = await fetchTopCategories();
+    // const raw = Array.isArray(data) ? data : (data?.data ?? []);
+    // const items = raw.map(c => ({ name: c.name, image: c.thumb, slug: c.slug }));
+    // renderCategories(items);
+
   }catch(err){
-    console.error('Failed to load categories:', err);
+    console.error('Failed to load categories (demo mode):', err);
   }
 })();
