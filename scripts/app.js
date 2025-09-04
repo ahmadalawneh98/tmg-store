@@ -131,3 +131,13 @@ renderProducts(demoProducts);
   }
 })();
 
+
+// Mobile menu toggle
+const nav = document.querySelector('.nav');
+const burger = document.querySelector('.burger');
+if (burger && nav) {
+  burger.addEventListener('click', () => {
+    nav.classList.toggle('is-open');
+  });
+}
+
