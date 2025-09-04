@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>TMG AMIR | Top-Up & Game Store</title>
+<meta name="theme-color" content="#0b0b0b" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#08080a; --bg2:#0f0f11; --card:#141418; --text:#fafafa; --muted:#b4b4b8;
+    --brand:#ff6a00; --brand2:#ff8f00; --brand3:#ffb84d; --ok:#10b981; --danger:#ef4444;
+    --accent:#3b82f6; --purple:#8b5cf6; --pink:#ec4899;
+    --radius:20px; --shadow:0 25px 60px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.02);
+    --glow-brand: 0 0 40px rgba(255,106,0,.4), 0 0 80px rgba(255,143,0,.2);
+    --glass: rgba(255,255,255,.05);
+    --glass-border: rgba(255,255,255,.1);
+  }
+  
+  *{box-sizing:border-box;} 
+  html{scroll-behavior:smooth;}
+  html,body{height:100%;}
+  
+  body{
+    margin:0;
+    background: 
+      radial-gradient(1400px 800px at 90% -5%, rgba(255,106,0,.08), transparent 50%),
+      radial-gradient(800px 600px at 10% 100%, rgba(139,92,246,.04), transparent 50%),
+      radial-gradient(600px 400px at 50% 50%, rgba(59,130,246,.03), transparent 60%),
+      linear-gradient(180deg, var(--bg) 0%, #0a0a0c 100%);
+    color:var(--text); 
+    font-family:'Inter',system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial; 
+    overflow-x:hidden;
+    line-height:1.6;
+    font-weight:400;
+  }
+  
+  a{color:inherit;text-decoration:none;} 
+  img{max-width:100%;display:block;}
+  
+  /* ===== Enhanced Background Particles ===== */
+  #bgParticles{
+    position:fixed;inset:0;z-index:-1;
+    background:transparent;
+    opacity:0.8;
+  }
+
+  /* ===== Enhanced Navbar ===== */
+  .nav{
+    position:sticky; top:0; z-index:50; 
+    backdrop-filter:saturate(180%) blur(20px);
+    background:linear-gradient(180deg,rgba(8,8,10,.85),rgba(8,8,10,.65));
+    border-bottom:1px solid var(--glass-border);
+    box-shadow: 0 8px 32px rgba(0,0,0,.3);
+  }
+  
+  .nav .wrap{
+    max-width:1200px; margin:auto; padding:12px 20px; 
+    display:flex; gap:16px; align-items:center;
+  }
+  
+  .brand{
+    display:flex; align-items:center; gap:12px; 
+    font-weight:900; letter-spacing:0.5px; font-size:18px;
+    transition: transform 0.3s ease;
+  }
+  
+  .brand:hover{transform:translateY(-1px);}
+  
+  .brand img{
+    width:48px;height:48px;border-radius:14px;object-fit:cover;
+    box-shadow: var(--glow-brand);
+    animation:logoPulse 4s ease-in-out infinite;
+    border: 1px solid rgba(255,106,0,.3);
+  }
+  
+  @keyframes logoPulse{
+    0%,100%{
+      box-shadow: 0 0 20px rgba(255,106,0,.4), 0 0 40px rgba(255,143,0,.2);
+      transform: scale(1);
+    }
+    50%{
+      box-shadow: 0 0 30px rgba(255,143,0,.6), 0 0 60px rgba(255,184,77,.3);
+      transform: scale(1.02);
+    }
+  }
+  
+  .navlinks{
+    margin-inline-start:auto; display:flex; gap:8px; align-items:center;
+  }
+  
+  .navlinks a{
+    padding:10px 16px; border-radius:14px; color:var(--text); 
+    font-weight:600; font-size:14px;
+    border:1px solid var(--glass-border); 
+    background: var(--glass);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .navlinks a::before{
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.1), transparent);
+    transition: left 0.5s;
+  }
+  
+  .navlinks a:hover{
+    transform:translateY(-2px); 
+    border-color:rgba(255,143,0,.6); 
+    box-shadow:0 10px 25px rgba(255,106,0,.25);
+    background: rgba(255,106,0,.1);
+  }
+  
+  .navlinks a:hover::before{left: 100%;}
+  
+  .cta{
+    background:linear-gradient(135deg,var(--brand),var(--brand2)) !important; 
+    border-color:transparent !important;
+    color: white !important;
+    font-weight: 700 !important;
+    box-shadow: 0 8px 25px rgba(255,106,0,.4) !important;
+  }
+
+  /* ===== Enhanced Hero ===== */
+  .hero{
+    position:relative; max-width:1200px; margin:30px auto 0; padding:40px 20px 30px;
+    display:grid; grid-template-columns:1.2fr .8fr; gap:40px; align-items:center;
+  }
+  
+  @media (max-width: 950px){ 
+    .hero{grid-template-columns:1fr; text-align:center; gap:30px;} 
+  }
+  
+  .hero h1{
+    font-size:clamp(32px,5vw,64px); margin:0 0 16px; line-height:1.1; 
+    font-weight:900;
+    background: linear-gradient(135deg, var(--text) 0%, rgba(255,106,0,.9) 50%, var(--brand3) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: 0 8px 32px rgba(0,0,0,.6);
+    animation: textGlow 3s ease-in-out infinite alternate;
+  }
+  
+  @keyframes textGlow{
+    from{filter: drop-shadow(0 0 20px rgba(255,106,0,.3));}
+    to{filter: drop-shadow(0 0 30px rgba(255,143,0,.5));}
+  }
+  
+  .badge{
+    display:inline-flex; align-items:center; gap:10px; 
+    border:1px solid var(--glass-border);
+    color:var(--text); padding:10px 16px; border-radius:999px;
+    background:linear-gradient(135deg,rgba(255,143,0,.15),rgba(255,106,0,.05));
+    box-shadow: 
+      inset 0 1px 0 rgba(255,255,255,.2),
+      0 8px 32px rgba(255,106,0,.2);
+    backdrop-filter: blur(10px);
+    font-weight: 500;
+  }
+  
+  .badge dot{
+    width:10px;height:10px;border-radius:50%;
+    background:var(--ok);display:inline-block;
+    box-shadow:0 0 15px var(--ok);
+    animation: pulse 2s infinite;
+  }
+  
+  @keyframes pulse{
+    0%,100%{transform: scale(1); opacity: 1;}
+    50%{transform: scale(1.2); opacity: 0.7;}
+  }
+  
+  .lead{
+    color:var(--muted); font-size:clamp(16px,2.2vw,20px); 
+    margin:16px 0 24px; font-weight:400; line-height:1.7;
+  }
+  
+  .btns{
+    display:flex; gap:14px; align-items:center; flex-wrap:wrap; 
+    justify-content:flex-start;
+  }
+  
+  .btn{
+    display:inline-flex; align-items:center; gap:12px; 
+    font-weight:700; padding:14px 20px; border-radius:16px;
+    border:1px solid var(--glass-border); 
+    background: var(--glass); color:var(--text); 
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+    position:relative; overflow: hidden;
+    backdrop-filter: blur(10px);
+  }
+  
+  .btn::before{
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 0; height: 0;
+    background: radial-gradient(circle, rgba(255,255,255,.2) 0%, transparent 70%);
+    transition: all 0.6s;
+    transform: translate(-50%, -50%);
+  }
+  
+  .btn:hover{
+    transform:translateY(-3px); 
+    border-color:rgba(255,143,0,.6); 
+    box-shadow:0 15px 35px rgba(255,106,0,.3);
+  }
+  
+  .btn:hover::before{
+    width: 300px; height: 300px;
+  }
+  
+  .btn.primary{
+    background:linear-gradient(135deg,var(--brand2),var(--brand)); 
+    border:0; 
+    box-shadow:0 15px 35px rgba(255,106,0,.4);
+    color: white;
+    font-weight: 800;
+  }
+  
+  .btn.primary:hover{
+    box-shadow:0 20px 45px rgba(255,106,0,.5);
+  }
+
+  .heroCard{
+    position:relative; height:450px; border-radius:28px; overflow:hidden;
+    background:
+      radial-gradient(600px 300px at 75% 25%, rgba(255,106,0,.2), transparent 60%),
+      radial-gradient(400px 200px at 25% 75%, rgba(139,92,246,.1), transparent 60%),
+      linear-gradient(180deg,var(--card),#0a0a0c);
+    border:1px solid var(--glass-border); 
+    box-shadow: var(--shadow); 
+    display:grid; place-items:center;
+    backdrop-filter: blur(20px);
+  }
+  
+  @media (max-width: 950px){ 
+    .heroCard{height:380px;} 
+  }
+  
+  .heroCard::after{
+    content:""; position:absolute; inset:-3px; border-radius:32px;
+    background:conic-gradient(
+      from 180deg, 
+      rgba(255,143,0,.4) 0deg,
+      rgba(255,106,0,.3) 90deg,
+      transparent 180deg, 
+      transparent 270deg, 
+      rgba(255,143,0,.4) 360deg
+    );
+    filter:blur(12px); z-index:-1; 
+    animation:spin 12s linear infinite;
+  }
+  
+  @keyframes spin{to{transform:rotate(360deg);}}
+  
+  .logoWrap{
+    width:min(80%,380px); aspect-ratio:1/1; 
+    display:grid; place-items:center; border-radius:28px; padding:25px;
+    background:
+      radial-gradient(350px 175px at 50% 30%, rgba(255,106,0,.15), transparent 70%),
+      var(--glass);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+  }
+  
+  .logoWrap img{
+    width:100%; height:100%; object-fit:contain;
+    filter: 
+      drop-shadow(0 0 30px rgba(255,106,0,.5)) 
+      drop-shadow(0 0 60px rgba(255,143,0,.3));
+    animation:float 6s ease-in-out infinite;
+  }
+  
+  @keyframes float{
+    0%,100%{transform:translateY(0) rotate(0deg);}
+    50%{transform:translateY(-12px) rotate(2deg);}
+  }
+
+  /* ===== Enhanced Sections ===== */
+  .section{max-width:1200px;margin:60px auto;padding:0 20px;}
+  
+  .stit{
+    font-size:clamp(28px,3.5vw,42px);margin:0 0 20px;font-weight:900;
+    background: linear-gradient(135deg, var(--text) 30%, var(--brand) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  .sub{color:var(--muted);margin-top:-8px;font-size:18px;font-weight:400;}
+
+  /* ===== Enhanced Grids & Cards ===== */
+  .grid{
+    display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px;
+  }
+  
+  @media (max-width:1100px){.grid{grid-template-columns:repeat(3,1fr);}}
+  @media (max-width:780px){.grid{grid-template-columns:repeat(2,1fr);}}
+  @media (max-width:520px){.grid{grid-template-columns:1fr;}}
+  
+  .card{
+    position:relative; 
+    background:
+      linear-gradient(180deg, var(--card) 0%, rgba(10,10,12,.8) 100%);
+    border:1px solid var(--glass-border); 
+    border-radius:var(--radius);
+    overflow:hidden; 
+    box-shadow: var(--shadow); 
+    transform-style:preserve-3d;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(20px);
+  }
+  
+  .card::before{
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, var(--glass) 0%, transparent 50%);
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  
+  .card:hover::before{opacity: 1;}
+  
+  .card:hover{
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 
+      0 35px 80px rgba(0,0,0,.4),
+      0 0 0 1px rgba(255,143,0,.3),
+      0 0 50px rgba(255,106,0,.2);
+  }
+  
+  .card .img{
+    aspect-ratio:1/1; background:#050507; overflow:hidden;
+    position: relative;
+  }
+  
+  .card .img::after{
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,106,0,.1) 0%, transparent 50%);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  
+  .card:hover .img::after{opacity: 1;}
+  
+  .card .img img{
+    width:100%;height:100%;object-fit:cover; 
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .card:hover .img img{transform:scale(1.08);}
+  
+  .card .body{padding:18px 18px 20px;}
+  
+  .title{
+    font-weight:800;font-size:18px;margin:0;
+    color: var(--text);
+    line-height: 1.4;
+  }
+  
+  .price{
+    margin-top:8px;font-size:20px;font-weight:900; 
+    letter-spacing:0.3px;
+    background: linear-gradient(135deg, var(--brand) 0%, var(--brand3) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  .price .sym{opacity:.9;margin-inline:6px;}
+  
+  .buy{margin-top:12px;}
+  
+  .buy .btn{
+    width:100%;justify-content:center;
+    font-size: 14px;
+    padding: 12px 16px;
+  }
+  
+  .shine{
+    position:absolute; inset:0; pointer-events:none;
+    background: linear-gradient(
+      110deg, 
+      transparent 0%, 
+      rgba(255,255,255,.15) 40%, 
+      rgba(255,106,0,.2) 50%,
+      rgba(255,255,255,.15) 60%,
+      transparent 100%
+    );
+    transform: translateX(-100%); opacity:0; 
+    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .card:hover .shine{
+    transform:translateX(100%); opacity:1;
+  }
+
+  /* ===== Enhanced Footer ===== */
+  .footer{
+    margin-top:80px; padding:40px 20px; text-align:center; 
+    color:var(--muted); font-size:16px;
+    background:
+      linear-gradient(180deg, transparent 0%, rgba(255,106,0,.02) 50%, transparent 100%),
+      linear-gradient(180deg,var(--bg2),var(--bg)); 
+    border-top:1px solid var(--glass-border);
+    backdrop-filter: blur(20px);
+  }
+
+  /* ===== Enhanced Reveal Animation ===== */
+  .reveal{
+    opacity:0; 
+    transform:translateY(40px) scale(0.95); 
+    transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .reveal.show{
+    opacity:1; 
+    transform:translateY(0) scale(1);
+  }
+
+  /* ===== Enhanced Badge ===== */
+  #curx-badge{
+    display:inline-flex;align-items:center;gap:0.6rem;
+    border:1px solid var(--glass-border);
+    padding:0.5rem 0.8rem;border-radius:1rem;
+    background: linear-gradient(135deg, rgba(255,255,255,.95) 0%, rgba(240,240,240,.9) 100%);
+    color:#111;margin-left:0.8rem;
+    box-shadow: 0 8px 25px rgba(0,0,0,.15);
+    backdrop-filter: blur(10px);
+  }
+  
+  #curx-badge .curx-flag{
+    width:14px;height:14px;border-radius:4px;background:#006c35;
+  }
+  
+  #curx-badge .curx-sym{font-weight:800;}
+  #curx-badge .curx-code{opacity:.8;font-weight:700;}
+
+  /* ===== Enhanced Scrollbar ===== */
+  ::-webkit-scrollbar{width:8px;}
+  ::-webkit-scrollbar-track{background:var(--bg);}
+  ::-webkit-scrollbar-thumb{
+    background:linear-gradient(180deg, var(--brand), var(--brand2));
+    border-radius:4px;
+  }
+  ::-webkit-scrollbar-thumb:hover{
+    background:linear-gradient(180deg, var(--brand2), var(--brand3));
+  }
+</style>
+</head>
+<body>
+
+<canvas id="bgParticles" aria-hidden="true"></canvas>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#">
+      <img src="Images/Logo.PNG" alt="TMG AMIR logo">
+      <span>TMG&nbsp;AMIR</span>
+    </a>
+    <nav class="navlinks">
+      <a href="#categories">Categories</a>
+      <a href="#products">Products</a>
+      <a class="cta" href="https://t.me/AMIR21_07" target="_blank" rel="noopener">Contact</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div>
+    <span class="badge"><dot></dot> Fast & Secure Manual Top-Up</span>
+    <h1>Your premium gateway for game top-ups</h1>
+    <p class="lead">Plug your catalogue via API/Webhooks and render it below. This hero stays minimal and brand-first.</p>
+    <div class="btns">
+      <a class="btn primary" href="#products">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 3h2l.4 2M7 13h10l3-8H5.4M7 13L5.4 5M7 13l-2 9m12-9l2 9M9 22a1 1 0 100-2 1 1 0 000 2zm8 0a1 1 0 100-2 1 1 0 000 2z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Shop now
+      </a>
+      <a class="btn" href="https://wa.me/962786041666" target="_blank" rel="noopener">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20.5 3.5A10 10 0 004 19.7L3 22l2.5-.7A10 10 0 1020.5 3.5z" stroke="currentColor" stroke-width="1.5"/><path d="M16.3 14.2c-.2.6-1.2 1.1-1.7 1.1-.4 0-.9-.1-1.9-.6-1.6-.8-2.6-2.7-2.7-2.9-.1-.1-.6-.8-.6-1.6 0-.8.4-1.2.5-1.4.2-.2.4-.3.5-.3h.4c.1 0 .3 0 .4.3.2.5.7 1.7.7 1.8 0 .2.1.4 0 .6-.1.2-.2.3-.3.5-.1.1-.2.2-.1.4.2.3.7 1.1 1.4 1.5.9.6 1.6.8 1.9 1 .2.1.3.1.5 0l.7-.3c.2-.1.4 0 .5.1.1.1.5.4.6.5.1.1.1.3.1.4z" fill="currentColor"/></svg>
+        WhatsApp
+      </a>
+      <a class="btn" href="https://t.me/AMIR21_07" target="_blank" rel="noopener">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 3L3 10l6 2 2 6 10-15z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        Telegram
+      </a>
+    </div>
+  </div>
+
+  <div class="heroCard">
+    <div class="logoWrap">
+      <img src="Images/Logo.PNG" alt="TMG AMIR">
+    </div>
+    <span class="shine" aria-hidden="true"></span>
+  </div>
+</section>
+
+<!-- ===== Categories (dynamic) ===== -->
+<section id="categories" class="section reveal">
+  <h2 class="stit">Categories</h2>
+  <p class="sub">Fetched from Easy Orders API — render here.</p>
+  <div id="categoriesGrid" class="grid" aria-live="polite"></div>
+</section>
+
+<!-- ===== Products (dynamic) ===== -->
+<section id="products" class="section reveal">
+  <h2 class="stit">Products</h2>
+  <p class="sub">This grid is empty by default; populate it from your API.</p>
+  <div id="productsGrid" class="grid" aria-live="polite"></div>
+</section>
+
+<footer class="footer">
+  © <span id="y"></span> TMG AMIR. All rights reserved.
+</footer>
+
+<!-- ===== Templates (for future rendering) ===== -->
+<template id="categoryCardTpl">
+  <article class="card">
+    <div class="img"><img alt=""></div>
+    <div class="body">
+      <h3 class="title"></h3>
+    </div>
+    <span class="shine" aria-hidden="true"></span>
+  </article>
+</template>
+
+<template id="productCardTpl">
+  <article class="card tilt">
+    <div class="img"><img alt=""></div>
+    <div class="body">
+      <h3 class="title"></h3>
+      <div class="price"><span class="sym">€</span><span class="amount">0.00</span></div>
+      <div class="buy"><a class="btn primary" target="_blank" rel="noopener">Buy now</a></div>
+    </div>
+    <span class="shine" aria-hidden="true"></span>
+  </article>
+</template>
+
+<script>
+/* ========= Year ========= */
+document.getElementById('y').textContent = new Date().getFullYear();
+
+/* ========= Enhanced Reveal on scroll ========= */
+const io = new IntersectionObserver(es=>{
+  es.forEach((e, index)=>{ 
+    if(e.isIntersecting){ 
+      setTimeout(() => {
+        e.target.classList.add('show'); 
+        io.unobserve(e.target);
+      }, index * 150);
+    }
+  });
+},{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+
+/* ========= Enhanced tilt on cards ========= */
+function attachTilt(root=document){
+  root.querySelectorAll('.tilt').forEach(card=>{
+    const strength = 8; let raf=null;
+    function move(e){
+      const r = card.getBoundingClientRect();
+      const px = (e.clientX - r.left)/r.width - .5;
+      const py = (e.clientY - r.top)/r.height - .5;
+      card.style.transform = `perspective(1000px) rotateX(${py*strength}deg) rotateY(${-px*strength}deg) translateZ(20px)`;
+    }
+    function leave(){ 
+      card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) translateZ(0)'; 
+    }
+    card.addEventListener('mousemove', e=>{ 
+      cancelAnimationFrame(raf); 
+      raf=requestAnimationFrame(()=>move(e)); 
+    });
+    card.addEventListener('mouseleave', leave);
+  });
+}
+
+/* ========= Enhanced background glow particles ========= */
+const c = document.getElementById('bgParticles');
+const ctx = c.getContext('2d',{ alpha:true });
+let W,H,dpr,parts=[];
+
+function resize(){
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  W = c.width = innerWidth * dpr; 
+  H = c.height = innerHeight * dpr;
+  c.style.width = innerWidth+'px'; 
+  c.style.height = innerHeight+'px';
+  
+  const particleCount = Math.min(100, Math.floor(innerWidth/10));
+  parts = Array.from({length: particleCount}, () => ({
+    x: Math.random()*W, 
+    y: Math.random()*H, 
+    r: Math.random()*3 + 1,
+    s: Math.random()*1.5 + .3, 
+    a: Math.random()*Math.PI*2,
+    color: Math.random() > 0.7 ? 'brand2' : 'brand',
+    opacity: Math.random() * 0.6 + 0.2
+  }));
+}
+
+resize(); 
+addEventListener('resize', resize);
+
+(function loop(){
+  ctx.clearRect(0,0,W,H);
+  
+  for(const p of parts){
+    p.x += Math.cos(p.a)*p.s; 
+    p.y += Math.sin(p.a)*p.s*0.6; 
+    p.a += (Math.random()-.5)*0.08;
+    
+    if(p.x<-50) p.x=W+50; 
+    if(p.x>W+50) p.x=-50; 
+    if(p.y<-50) p.y=H+50; 
+    if(p.y>H+50) p.y=-50;
+    
+    const colors = {
+      brand: [255,106,0],
+      brand2: [255,143,0]
+    };
+    
+    const [r,g,b] = colors[p.color];
+    
+    const g1 = ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*12);
+    g1.addColorStop(0,`rgba(${r},${g},${b},${p.opacity*0.4})`); 
+    g1.addColorStop(.4,`rgba(${r},${g},${b},${p.opacity*0.15})`); 
+    g1.addColorStop(1,'transparent');
+    
+    ctx.fillStyle = g1; 
+    ctx.beginPath(); 
+    ctx.arc(p.x,p.y,p.r*12,0,Math.PI*2); 
+    ctx.fill();
+  }
+  requestAnimationFrame(loop);
+})();
+
+/* ========= Render helpers (unchanged) ========= */
+window.renderCategories = function(items=[]){
+  const grid = document.getElementById('categoriesGrid');
+  grid.innerHTML = '';
+  const tpl = document.getElementById('categoryCardTpl').content;
+  items.forEach(it=>{
+    const n = tpl.cloneNode(true);
+    n.querySelector('img').src = it.image || '';
+    n.querySelector('img').alt = it.name || 'Category';
+    n.querySelector('.title').textContent = it.name || 'Category';
+    grid.appendChild(n);
+  });
+};
+
+window.renderProducts = function(items=[]){
+  const grid = document.getElementById('productsGrid');
+  grid.innerHTML = '';
+  const tpl = document.getElementById('productCardTpl').content;
+  items.forEach(it=>{
+    const n = tpl.cloneNode(true);
+    n.querySelector('img').src = it.image || '';
+    n.querySelector('img').alt = it.title || 'Product';
+    n.querySelector('.title').textContent = it.title || 'Product';
+    n.querySelector('.amount').textContent = (it.price ?? 0).toFixed(2);
+    n.querySelector('.buy a').href = it.url || '#';
+    grid.appendChild(n);
+  });
+  attachTilt(grid);
+};
+
+
+
+
+</script>
+
+
+<script>
+// أمثلة على الفلاتر: parent_id IS NULL AND hidden = false
+const proxy = '/api/categories'; // على Vercel: https://YOUR-APP.vercel.app/api/categories
+
+function encodeFilters(arr){
+  return arr.map(([f,op,val]) => (op==='isnull'||op==='notnull') ? `${f}||${op}` : `${f}||${op}||${val}`);
+}
+
+async function fetchTopCategories(){
+  const url = new URL(proxy, location.origin);
+  encodeFilters([['parent_id','isnull'], ['hidden','eq','false']])
+    .forEach(f => url.searchParams.append('filters', f));
+  const r = await fetch(url);
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+</script>
+
+
+</body>
+</html>
