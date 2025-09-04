@@ -434,8 +434,19 @@
     width:14px;height:14px;border-radius:4px;background:#006c35;
   }
   
-  #curx-badge .curx-sym{font-weight:800;}
-  #curx-badge .curx-code{opacity:.8;font-weight:700;}
+#curx-badge .curx-sym {
+  font-weight: 800;
+  font-size: 14px;        /* خليها واضحة */
+  display: inline-block;  /* يضمن إنها تنعرض */
+  margin-right: 2px;      /* مسافة صغيرة بينها وبين الرقم */
+}
+
+#curx-badge .curx-code {
+  opacity: .8;
+  font-weight: 700;
+  font-size: 13px;
+}
+
 
   /* ===== Enhanced Scrollbar ===== */
   ::-webkit-scrollbar{width:8px;}
