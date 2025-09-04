@@ -111,13 +111,14 @@ function renderProducts(items=[]){
     renderCategories(demoCategories);
 
     // ✅ منتجات ثابتة مؤقتًا (بدون أسعار)
-    const demoProducts = [
-      { title: 'Call of Duty CP',      image: '/Images/cod-cp.png',       url: '#' },
-      { title: 'PUBG UC',              image: '/Images/pubg-uc.png',      url: '#' },
-      { title: 'Clash of Clans Gems',  image: '/Images/coc-gems.png',     url: '#' },
-      { title: 'Roblox Robux',         image: '/Images/robux.png',        url: '#' },
-    ];
-    renderProducts(demoProducts);
+   const demoProducts = [
+  { title: 'Call of Duty CP',      image: '/Images/cod-cp.png',       url: '#', price: 9.99 },
+  { title: 'PUBG UC',              image: '/Images/pubg-uc.png',      url: '#', price: 14.99 },
+  { title: 'Clash of Clans Gems',  image: '/Images/coc-gems.png',     url: '#', price: 4.99 },
+  { title: 'Roblox Robux',         image: '/Images/robux.png',        url: '#', price: 19.99 },
+];
+renderProducts(demoProducts);
+
 
     // ⏮️ لإعادة التفعيل لاحقًا:
     // const data = await fetchTopCategories();
