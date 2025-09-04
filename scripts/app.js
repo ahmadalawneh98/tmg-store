@@ -103,12 +103,21 @@ function renderProducts(items=[]){
   try{
     // ✅ بيانات ثابتة مؤقتًا بدل EasyOrders API
     const demoCategories = [
-      { name: 'Call of Duty',   image: '/Images/cod.png',               slug: 'call-of-duty' },
-      { name: 'PUBG',           image: '/Images/pubg.png',              slug: 'pubg' },
-      { name: 'Clash of Clans', image: '/Images/clash-of-clans.png',   slug: 'clash-of-clans' },
-      { name: 'Roblox',         image: '/Images/roblox.png',            slug: 'roblox' },
+      { name: 'Call of Duty',   image: '/Images/cod.png',             slug: 'call-of-duty' },
+      { name: 'PUBG',           image: '/Images/pubg.png',            slug: 'pubg' },
+      { name: 'Clash of Clans', image: '/Images/clash-of-clans.png',  slug: 'clash-of-clans' },
+      { name: 'Roblox',         image: '/Images/roblox.png',          slug: 'roblox' },
     ];
     renderCategories(demoCategories);
+
+    // ✅ منتجات ثابتة مؤقتًا (بدون أسعار)
+    const demoProducts = [
+      { title: 'Call of Duty CP',      image: '/Images/cod-cp.png',       url: '#' },
+      { title: 'PUBG UC',              image: '/Images/pubg-uc.png',      url: '#' },
+      { title: 'Clash of Clans Gems',  image: '/Images/coc-gems.png',     url: '#' },
+      { title: 'Roblox Robux',         image: '/Images/robux.png',        url: '#' },
+    ];
+    renderProducts(demoProducts);
 
     // ⏮️ لإعادة التفعيل لاحقًا:
     // const data = await fetchTopCategories();
@@ -117,6 +126,7 @@ function renderProducts(items=[]){
     // renderCategories(items);
 
   }catch(err){
-    console.error('Failed to load categories (demo mode):', err);
+    console.error('Failed to load categories/products (demo mode):', err);
   }
 })();
+
