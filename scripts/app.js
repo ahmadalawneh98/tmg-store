@@ -4,7 +4,7 @@ import {
   fetchCategoriesByParent,
   fetchAllProducts,
   fetchProductsByCategory,
-  fetchProductsByCategories, // NEW
+  fetchProductsByCategories, // <- لازم تكون موجودة في /scripts/api.js وتستخدم in
 } from './api.js';
 
 /* ========= Year ========= */
@@ -119,7 +119,6 @@ function pickPrice(p){
   const pr = Number(p?.price || 0);
   return sp > 0 ? sp : pr;
 }
-
 function mapProducts(raw = []) {
   return raw.map(p => ({
     id:    p?.id ?? p?._id ?? p?.uuid ?? null,
@@ -134,21 +133,45 @@ async function loadProducts({ categoryId = null, categoriesIn = null, page = 1 }
   const grid = document.getElementById('productsGrid');
   if (grid) grid.innerHTML = '<div class="loading">Loading…</div>';
 
-  let res;
-  if (Array.isArray(categoriesIn) && categoriesIn.length) {
-    res = await fetchProductsByCategories(categoriesIn, { page });
-  } else if (categoryId) {
-    res = await fetchProductsByCategory(categoryId, { page });
-  } else {
-    res = await fetchAllProducts({ page });
+  try {
+    let res;
+    if (Array.isArray(categoriesIn) && categoriesIn.length) {
+      // مهم: تأكد أن fetchProductsByCategories يستخدم filter=in (وليس $in)
+      res = await fetchProductsByCategories(categoriesIn, { page /*, join: 'categories'*/ });
+    } else if (categoryId) {
+      res = await fetchProductsByCategory(categoryId, { page });
+    } else {
+      res = await fetchAllProducts({ page });
+    }
+    const raw = Array.isArray(res) ? res : (res?.data ?? res ?? []);
+    const items = mapProducts(raw);
+    renderProducts(items);
+  } catch (err) {
+    console.error('[Products] load failed:', err);
+    grid.innerHTML = '<div class="loading">No products found.</div>';
   }
-
-  const raw = Array.isArray(res) ? res : (res?.data ?? res ?? []);
-  const items = mapProducts(raw);
-  renderProducts(items);
 }
 
-/* ========= Back Button (only in subcategory) ========= */
+/* ========= Get all descendants (BFS) ========= */
+async function getAllDescendantCategoryIds(rootId){
+  const out = new Set();
+  const queue = [rootId];
+  // نجمع أبناء كل مستوى
+  while (queue.length){
+    const pid = queue.shift();
+    try {
+      const res = await fetchCategoriesByParent(pid);
+      const raw = Array.isArray(res) ? res : (res?.data ?? res ?? []);
+      const ids = raw.map(c => c?.id ?? c?._id ?? c?.uuid ?? c?.pk).filter(Boolean);
+      ids.forEach(id => { if(!out.has(id)){ out.add(id); queue.push(id); } });
+    } catch(e){
+      console.warn('Descendants fetch failed for', pid, e);
+    }
+  }
+  return Array.from(out);
+}
+
+/* ========= Back Button ========= */
 let backBtn = document.getElementById('backBtn');
 if (!backBtn) {
   backBtn = document.createElement('button');
@@ -156,13 +179,9 @@ if (!backBtn) {
   backBtn.textContent = 'Back';
   backBtn.className = 'back-btn';
   backBtn.style.display = 'none';
-
   const gridContainer = document.getElementById('categoriesGrid')?.parentElement;
-  if (gridContainer) {
-    gridContainer.insertBefore(backBtn, gridContainer.firstChild);
-  } else {
-    document.querySelector('.nav')?.appendChild(backBtn);
-  }
+  if (gridContainer) gridContainer.insertBefore(backBtn, gridContainer.firstChild);
+  else document.querySelector('.nav')?.appendChild(backBtn);
 }
 backBtn.addEventListener('click', () => history.back());
 function setBackVisibility(parentId) {
@@ -177,24 +196,33 @@ async function loadCategories(parentId = null) {
   const raw = Array.isArray(res) ? res : (res?.data ?? res ?? []);
 
   if (parentId) {
-    // IDs للأبناء المباشرين + الأب
-    const childIds = raw.map(c => (c?.id ?? c?._id ?? c?.uuid ?? c?.pk)).filter(Boolean);
-    const allIds = [parentId, ...childIds];
+    // 1) اجلب كل الأحفاد (كل المستويات)
+    const descendants = await getAllDescendantCategoryIds(parentId);
+    const allIds = [parentId, ...descendants];
 
-    // اعرض منتجات الأب + الأبناء
+    // 2) اعرض منتجات الأب + جميع أحفاده
     await loadProducts({ categoriesIn: allIds, page: 1 });
 
-    // سكرول لقسم المنتجات
+    // 3) سكرول لقسم المنتجات
     document.getElementById('products')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-    // لو ما في Sub-categories، نكتفي بالمنتجات
-    if (childIds.length === 0) return;
-  } else {
-    // المستوى الأعلى: منتجات عامة
-    await loadProducts({ page: 1 });
+    // 4) اعرض كروت الأبناء المباشرين (لو فيه)
+    if (raw.length > 0) {
+      const items = raw.map(c => ({
+        id: c?.id ?? c?._id ?? c?.uuid ?? c?.pk ?? null,
+        name: c?.name ?? 'Category',
+        image: c?.thumb ?? c?.image ?? '',
+        slug: c?.slug ?? ''
+      }));
+      renderCategories(items);
+    } else {
+      // ما فيه Sub-categories
+      document.getElementById('categoriesGrid').innerHTML = '';
+    }
+    return;
   }
 
-  // عرض كروت التصنيفات (إن وجدت)
+  // المستوى الأعلى: اعرض الكاتيجوريز والمنتجات العامة
   const items = raw.map(c => ({
     id: c?.id ?? c?._id ?? c?.uuid ?? c?.pk ?? null,
     name: c?.name ?? 'Category',
@@ -202,6 +230,7 @@ async function loadCategories(parentId = null) {
     slug: c?.slug ?? ''
   }));
   renderCategories(items);
+  await loadProducts({ page: 1 });
 }
 
 async function navigateToCategory(categoryId, slug) {
@@ -234,7 +263,7 @@ window.addEventListener('popstate', async (e) => {
   try {
     history.replaceState({ parentId: null }, '', '#/categories');
     setBackVisibility(null);
-    await loadCategories(null); // هذه الدالة ستعرض أيضًا المنتجات العامة
+    await loadCategories(null);
   } catch (err) {
     console.error('Failed to load:', err);
   }
