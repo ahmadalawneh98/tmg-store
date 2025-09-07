@@ -1,10 +1,10 @@
-// /scripts/app.js
+// /scripts/app.js - COMPLETE FIXED VERSION
 import {
   fetchTopCategories,
   fetchCategoriesByParent,
   fetchAllProducts,
   fetchProductsByCategory,
-  fetchProductsByCategories, // <- لازم تكون موجودة في /scripts/api.js وتستخدم in
+  fetchProductsByCategories, // مرة أخرى لأنها موجودة ومصححة في api.js
 } from './api.js';
 
 /* ========= Year ========= */
@@ -119,6 +119,7 @@ function pickPrice(p){
   const pr = Number(p?.price || 0);
   return sp > 0 ? sp : pr;
 }
+
 function mapProducts(raw = []) {
   return raw.map(p => ({
     id:    p?.id ?? p?._id ?? p?.uuid ?? null,
@@ -129,49 +130,46 @@ function mapProducts(raw = []) {
   }));
 }
 
+// FIXED: أعد استخدام fetchProductsByCategories مع الإصلاح
 async function loadProducts({ categoryId = null, categoriesIn = null, page = 1 } = {}) {
   const grid = document.getElementById('productsGrid');
   if (grid) grid.innerHTML = '<div class="loading">Loading…</div>';
 
+  console.log('Loading products with params:', { categoryId, categoriesIn, page }); // للتشخيص
+
+  let res;
   try {
-    let res;
     if (Array.isArray(categoriesIn) && categoriesIn.length) {
-      // مهم: تأكد أن fetchProductsByCategories يستخدم filter=in (وليس $in)
-      res = await fetchProductsByCategories(categoriesIn, { page /*, join: 'categories'*/ });
+      console.log('Using fetchProductsByCategories with IDs:', categoriesIn);
+      res = await fetchProductsByCategories(categoriesIn, { page });
     } else if (categoryId) {
+      console.log('Using fetchProductsByCategory with ID:', categoryId);
       res = await fetchProductsByCategory(categoryId, { page });
     } else {
+      console.log('Using fetchAllProducts');
       res = await fetchAllProducts({ page });
     }
+
+    console.log('Products API response:', res); // للتشخيص
+
     const raw = Array.isArray(res) ? res : (res?.data ?? res ?? []);
+    console.log('Raw products after processing:', raw); // للتشخيص
+
     const items = mapProducts(raw);
-    renderProducts(items);
-  } catch (err) {
-    console.error('[Products] load failed:', err);
-    grid.innerHTML = '<div class="loading">No products found.</div>';
-  }
-}
+    console.log('Mapped products:', items); // للتشخيص
 
-/* ========= Get all descendants (BFS) ========= */
-async function getAllDescendantCategoryIds(rootId){
-  const out = new Set();
-  const queue = [rootId];
-  // نجمع أبناء كل مستوى
-  while (queue.length){
-    const pid = queue.shift();
-    try {
-      const res = await fetchCategoriesByParent(pid);
-      const raw = Array.isArray(res) ? res : (res?.data ?? res ?? []);
-      const ids = raw.map(c => c?.id ?? c?._id ?? c?.uuid ?? c?.pk).filter(Boolean);
-      ids.forEach(id => { if(!out.has(id)){ out.add(id); queue.push(id); } });
-    } catch(e){
-      console.warn('Descendants fetch failed for', pid, e);
+    if (items.length === 0) {
+      grid.innerHTML = '<div class="no-products">لا توجد منتجات في هذا القسم</div>';
+    } else {
+      renderProducts(items);
     }
+  } catch (error) {
+    console.error('Error loading products:', error);
+    grid.innerHTML = '<div class="error">حدث خطأ في تحميل المنتجات</div>';
   }
-  return Array.from(out);
 }
 
-/* ========= Back Button ========= */
+/* ========= Back Button (only in subcategory) ========= */
 let backBtn = document.getElementById('backBtn');
 if (!backBtn) {
   backBtn = document.createElement('button');
@@ -179,61 +177,71 @@ if (!backBtn) {
   backBtn.textContent = 'Back';
   backBtn.className = 'back-btn';
   backBtn.style.display = 'none';
+
   const gridContainer = document.getElementById('categoriesGrid')?.parentElement;
-  if (gridContainer) gridContainer.insertBefore(backBtn, gridContainer.firstChild);
-  else document.querySelector('.nav')?.appendChild(backBtn);
+  if (gridContainer) {
+    gridContainer.insertBefore(backBtn, gridContainer.firstChild);
+  } else {
+    document.querySelector('.nav')?.appendChild(backBtn);
+  }
 }
 backBtn.addEventListener('click', () => history.back());
 function setBackVisibility(parentId) {
   backBtn.style.display = parentId ? 'inline-block' : 'none';
 }
 
-/* ========= Navigation (Categories/Sub-categories) ========= */
+/* ========= Navigation (Categories/Sub-categories) - FIXED & IMPROVED ========= */
 async function loadCategories(parentId = null) {
+  console.log('Loading categories for parentId:', parentId); // للتشخيص
   setBackVisibility(parentId);
 
-  const res = parentId ? await fetchCategoriesByParent(parentId) : await fetchTopCategories();
-  const raw = Array.isArray(res) ? res : (res?.data ?? res ?? []);
+  try {
+    const res = parentId ? await fetchCategoriesByParent(parentId) : await fetchTopCategories();
+    const raw = Array.isArray(res) ? res : (res?.data ?? res ?? []);
+    console.log('Categories response:', raw); // للتشخيص
 
-  if (parentId) {
-    // 1) اجلب كل الأحفاد (كل المستويات)
-    const descendants = await getAllDescendantCategoryIds(parentId);
-    const allIds = [parentId, ...descendants];
+    if (parentId) {
+      // جمع IDs للأبناء المباشرين + الأب
+      const childIds = raw.map(c => (c?.id ?? c?._id ?? c?.uuid ?? c?.pk)).filter(Boolean);
+      const allIds = [parentId, ...childIds];
+      console.log('All category IDs (parent + children):', allIds); // للتشخيص
 
-    // 2) اعرض منتجات الأب + جميع أحفاده
-    await loadProducts({ categoriesIn: allIds, page: 1 });
+      // اعرض منتجات الأب + الأبناء (حسب المنطق الأصلي)
+      await loadProducts({ categoriesIn: allIds, page: 1 });
 
-    // 3) سكرول لقسم المنتجات
-    document.getElementById('products')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // سكرول لقسم المنتجات
+      document.getElementById('products')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-    // 4) اعرض كروت الأبناء المباشرين (لو فيه)
-    if (raw.length > 0) {
-      const items = raw.map(c => ({
-        id: c?.id ?? c?._id ?? c?.uuid ?? c?.pk ?? null,
-        name: c?.name ?? 'Category',
-        image: c?.thumb ?? c?.image ?? '',
-        slug: c?.slug ?? ''
-      }));
-      renderCategories(items);
+      // لو ما في Sub-categories، نكتفي بالمنتجات
+      if (childIds.length === 0) {
+        console.log('No subcategories found, showing only products');
+        return;
+      }
     } else {
-      // ما فيه Sub-categories
-      document.getElementById('categoriesGrid').innerHTML = '';
+      // المستوى الأعلى: منتجات عامة
+      await loadProducts({ page: 1 });
     }
-    return;
-  }
 
-  // المستوى الأعلى: اعرض الكاتيجوريز والمنتجات العامة
-  const items = raw.map(c => ({
-    id: c?.id ?? c?._id ?? c?.uuid ?? c?.pk ?? null,
-    name: c?.name ?? 'Category',
-    image: c?.thumb ?? c?.image ?? '',
-    slug: c?.slug ?? ''
-  }));
-  renderCategories(items);
-  await loadProducts({ page: 1 });
+    // عرض كروت التصنيفات (إن وجدت)
+    const items = raw.map(c => ({
+      id: c?.id ?? c?._id ?? c?.uuid ?? c?.pk ?? null,
+      name: c?.name ?? 'Category',
+      image: c?.thumb ?? c?.image ?? '',
+      slug: c?.slug ?? ''
+    }));
+    console.log('Mapped categories for display:', items); // للتشخيص
+    renderCategories(items);
+  } catch (error) {
+    console.error('Error loading categories:', error);
+    const grid = document.getElementById('categoriesGrid');
+    if (grid) {
+      grid.innerHTML = '<div class="error">حدث خطأ في تحميل التصنيفات</div>';
+    }
+  }
 }
 
 async function navigateToCategory(categoryId, slug) {
+  console.log('Navigating to category:', categoryId, slug); // للتشخيص
   history.pushState({ parentId: categoryId }, '', `#/categories/${categoryId}${slug ? ('/' + slug) : ''}`);
   await loadCategories(categoryId);
 }
@@ -246,6 +254,7 @@ if (categoriesGrid) {
     if (!card) return;
     const id = card.dataset.id;
     const slug = card.dataset.slug;
+    console.log('Category card clicked:', { id, slug }); // للتشخيص
     if (!id) return console.warn('No category id on card. Check API mapping.');
     await navigateToCategory(id, slug);
   });
@@ -254,6 +263,7 @@ if (categoriesGrid) {
 /* Browser Back/Forward support */
 window.addEventListener('popstate', async (e) => {
   const parentId = e.state?.parentId ?? null;
+  console.log('Browser back/forward, parentId:', parentId); // للتشخيص
   setBackVisibility(parentId);
   await loadCategories(parentId);
 });
@@ -261,11 +271,13 @@ window.addEventListener('popstate', async (e) => {
 /* ========= Boot ========= */
 (async () => {
   try {
+    console.log('Application starting...'); // للتشخيص
     history.replaceState({ parentId: null }, '', '#/categories');
     setBackVisibility(null);
     await loadCategories(null);
+    console.log('Application loaded successfully'); // للتشخيص
   } catch (err) {
-    console.error('Failed to load:', err);
+    console.error('Failed to load application:', err);
   }
 })();
 
