@@ -1,4 +1,4 @@
-// /api/products.js
+// /api/products.js  (تعديل بسيط)
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -10,27 +10,30 @@ export default async function handler(req, res) {
   const API_BASE = 'https://api.easy-orders.net/api/v1/external-apps/products';
   const API_KEY = process.env.EASY_ORDERS_API_KEY;
 
-  const { filter, filters, page, limit, sort, fields, join } = req.query;
   const url = new URL(API_BASE);
 
-  // multipliers
-  const appendFilter = (val) => url.searchParams.append('filter', val);
-  if (Array.isArray(filter)) filter.forEach(appendFilter);
-  else if (typeof filter === 'string') appendFilter(filter);
+  // مرّر الأساسيات
+  const pass = ['page','limit','sort','fields','join'];
+  for (const k of pass) if (req.query[k]) url.searchParams.set(k, String(req.query[k]));
 
-  if (Array.isArray(filters)) filters.forEach(appendFilter);
-  else if (typeof filters === 'string') appendFilter(filters);
+  // filters و filter (كلاهما مدعومان)
+  const append = v => url.searchParams.append('filter', v);
+  const { filter, filters } = req.query;
+  if (Array.isArray(filter)) filter.forEach(append);
+  else if (typeof filter === 'string') append(filter);
+  if (Array.isArray(filters)) filters.forEach(append);
+  else if (typeof filters === 'string') append(filters);
 
-  if (page)  url.searchParams.set('page', String(page));
-  if (limit) url.searchParams.set('limit', String(limit));
-  if (sort)  url.searchParams.set('sort', String(sort));
-  if (fields)url.searchParams.set('fields', String(fields));
-  if (join)  url.searchParams.set('join', String(join));
+  // مرّر أي بارامترات أخرى بدون ما تدعس على المذكورة
+  for (const [k, v] of Object.entries(req.query)) {
+    if (pass.includes(k) || k === 'filter' || k === 'filters') continue;
+    if (Array.isArray(v)) v.forEach(x => url.searchParams.append(k, x));
+    else if (typeof v === 'string') url.searchParams.set(k, v);
+  }
 
   try {
-    const r = await fetch(url.toString(), {
-      headers: { 'Api-Key': API_KEY, 'Accept': 'application/json' }
-    });
+    console.log('[ProductsProxy] →', url.toString()); // 👈 مهم جداً
+    const r = await fetch(url.toString(), { headers: { 'Api-Key': API_KEY, 'Accept': 'application/json' } });
     const body = await r.text();
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
