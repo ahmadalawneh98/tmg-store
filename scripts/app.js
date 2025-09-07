@@ -1,5 +1,10 @@
 // /scripts/app.js
-import { fetchTopCategories, fetchCategoriesByParent } from './api.js';
+import {
+  fetchTopCategories,
+  fetchCategoriesByParent,
+  fetchAllProducts,
+  fetchProductsByCategory
+} from './api.js';
 
 /* ========= Year ========= */
 document.getElementById('y').textContent = new Date().getFullYear();
@@ -80,7 +85,6 @@ function renderCategories(items = []) {
   items.forEach(it => {
     const n = tpl.cloneNode(true);
     const card = n.querySelector('.card');
-    // store data for click
     card.dataset.id = it.id ?? '';
     card.dataset.slug = it.slug ?? '';
     card.style.cursor = 'pointer';
@@ -108,6 +112,36 @@ function renderProducts(items = []) {
   attachTilt(grid);
 }
 
+/* ========= Products helpers ========= */
+function pickPrice(p){
+  const sp = Number(p?.sale_price || 0);
+  const pr = Number(p?.price || 0);
+  return sp > 0 ? sp : pr;
+}
+
+function mapProducts(raw = []) {
+  return raw.map(p => ({
+    id:    p?.id ?? p?._id ?? p?.uuid ?? null,
+    title: p?.name ?? 'Product',
+    image: p?.thumb || (Array.isArray(p?.images) ? p.images[0] : '') || '',
+    price: pickPrice(p),
+    url:   p?.slug ? `#/product/${p.slug}` : '#'
+  }));
+}
+
+async function loadProducts({ categoryId = null, page = 1 } = {}) {
+  const grid = document.getElementById('productsGrid');
+  if (grid) grid.innerHTML = '<div class="loading">Loading…</div>';
+
+  const res = categoryId
+    ? await fetchProductsByCategory(categoryId, { page })
+    : await fetchAllProducts({ page });
+
+  const raw = Array.isArray(res) ? res : (res?.data ?? res ?? []);
+  const items = mapProducts(raw);
+  renderProducts(items);
+}
+
 /* ========= Back Button (only in subcategory) ========= */
 let backBtn = document.getElementById('backBtn');
 if (!backBtn) {
@@ -115,9 +149,8 @@ if (!backBtn) {
   backBtn.id = 'backBtn';
   backBtn.textContent = 'Back';
   backBtn.className = 'back-btn';
-  backBtn.style.display = 'none'; // hidden by default
+  backBtn.style.display = 'none';
 
-  // Place it above the categories grid (safe fallback to .nav if needed)
   const gridContainer = document.getElementById('categoriesGrid')?.parentElement;
   if (gridContainer) {
     gridContainer.insertBefore(backBtn, gridContainer.firstChild);
@@ -125,7 +158,6 @@ if (!backBtn) {
     document.querySelector('.nav')?.appendChild(backBtn);
   }
 }
-
 backBtn.addEventListener('click', () => history.back());
 
 function setBackVisibility(parentId) {
@@ -134,16 +166,15 @@ function setBackVisibility(parentId) {
 
 /* ========= Navigation (Categories/Sub-categories) ========= */
 async function loadCategories(parentId = null) {
-  // toggle back button based on level
   setBackVisibility(parentId);
 
   const res = parentId ? await fetchCategoriesByParent(parentId) : await fetchTopCategories();
   const raw = Array.isArray(res) ? res : (res?.data ?? res ?? []);
 
-  // If no sub-categories: later you can load products for this category
+  // لا يوجد تصنيفات فرعية → اعرض منتجات التصنيف
   if (parentId && raw.length === 0) {
-    console.log('[Sub-categories] none → TODO: load products by category:', parentId);
-    renderProducts([]);
+    await loadProducts({ categoryId: parentId, page: 1 });
+    document.getElementById('products')?.scrollIntoView({ behavior:'smooth', block:'start' });
     return;
   }
 
@@ -154,7 +185,6 @@ async function loadCategories(parentId = null) {
     slug: c?.slug ?? ''
   }));
 
-  console.log('[Categories loaded]', { parentId, count: items.length, sample: items[0] });
   renderCategories(items);
 }
 
@@ -171,11 +201,7 @@ if (categoriesGrid) {
     if (!card) return;
     const id = card.dataset.id;
     const slug = card.dataset.slug;
-    console.log('[Category click]', { id, slug });
-    if (!id) {
-      console.warn('No category id on card. Check API mapping.');
-      return;
-    }
+    if (!id) return console.warn('No category id on card. Check API mapping.');
     await navigateToCategory(id, slug);
   });
 }
@@ -191,11 +217,11 @@ window.addEventListener('popstate', async (e) => {
 (async () => {
   try {
     history.replaceState({ parentId: null }, '', '#/categories');
-    setBackVisibility(null);          // top-level → hide back
-    await loadCategories(null);       // top-level
-    renderProducts([]);               // empty for now
+    setBackVisibility(null);
+    await loadCategories(null);
+    await loadProducts({ page: 1 }); // عرض المنتجات العامة في قسم Products
   } catch (err) {
-    console.error('Failed to load categories:', err);
+    console.error('Failed to load:', err);
   }
 })();
 
@@ -203,5 +229,22 @@ window.addEventListener('popstate', async (e) => {
 const nav = document.querySelector('.nav');
 const burger = document.querySelector('.burger');
 if (burger && nav) {
-  burger.addEventListener('click', () => nav.classList.toggle('is-open'));
+  burger.addEventListener('click', () => {
+    nav.classList.toggle('is-open');
+    document.body.classList.toggle('menu-open', nav.classList.contains('is-open'));
+  });
 }
+
+/* ========= Smooth scroll for nav links ========= */
+document.querySelectorAll('.navlinks a[href^="#"]').forEach(a=>{
+  a.addEventListener('click', e=>{
+    const id = a.getAttribute('href').slice(1);
+    const el = document.getElementById(id);
+    if(el){
+      e.preventDefault();
+      el.scrollIntoView({ behavior:'smooth', block:'start' });
+      nav.classList.remove('is-open');
+      document.body.classList.remove('menu-open');
+    }
+  });
+});
