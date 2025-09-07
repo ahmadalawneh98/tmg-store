@@ -1,5 +1,6 @@
 // scripts/app.js
-// import { fetchTopCategories } from './api.js'; // ⛔️ مؤقتًا معطّل (سنفعّله لاحقًا)
+// ✅ تفعيل الجلب الحقيقي للأقسام
+import { fetchTopCategories } from './api.js';
 
 /* ========= Year ========= */
 document.getElementById('y').textContent = new Date().getFullYear();
@@ -98,41 +99,29 @@ function renderProducts(items=[]){
   attachTilt(grid);
 }
 
-/* ========= Boot (Demo Mode: no API calls) ========= */
+/* ========= Boot ========= */
 (async ()=>{
   try{
-    // ✅ بيانات ثابتة مؤقتًا بدل EasyOrders API
-    const demoCategories = [
-      { name: 'Call of Duty',   image: '/Images/cod.png',             slug: 'call-of-duty' },
-      { name: 'PUBG',           image: '/Images/pubg.png',            slug: 'pubg' },
-      { name: 'Clash of Clans', image: '/Images/clash-of-clans.png',  slug: 'clash-of-clans' },
-      { name: 'Roblox',         image: '/Images/roblox.png',          slug: 'roblox' },
-    ];
-    renderCategories(demoCategories);
+    // ✅ جلب الأقسام من EasyOrders (حسب الوثائق: name, slug, thumb, ...)
+    const data = await fetchTopCategories();
+    const raw = Array.isArray(data) ? data : (data?.data ?? data ?? []);
+    const categories = raw.map(c => ({
+      name:  c?.name ?? 'Category',
+      image: c?.thumb ?? c?.image ?? '',
+      slug:  c?.slug ?? null
+    }));
+    renderCategories(categories);
 
-    // ✅ منتجات ثابتة مؤقتًا (بدون أسعار)
-   const demoProducts = [
-  { title: 'Call of Duty CP',      image: '/Images/cod-cp.png',       url: '#', price: 9.99 },
-  { title: 'PUBG UC',              image: '/Images/pubg-uc.png',      url: '#', price: 14.99 },
-  { title: 'Clash of Clans Gems',  image: '/Images/coc-gems.png',     url: '#', price: 4.99 },
-  { title: 'Roblox Robux',         image: '/Images/robux.png',        url: '#', price: 19.99 },
-];
-renderProducts(demoProducts);
-
-
-    // ⏮️ لإعادة التفعيل لاحقًا:
-    // const data = await fetchTopCategories();
-    // const raw = Array.isArray(data) ? data : (data?.data ?? []);
-    // const items = raw.map(c => ({ name: c.name, image: c.thumb, slug: c.slug }));
-    // renderCategories(items);
+    // 🛒 المنتجات: نتركها فاضية الآن (نربطها سوا لاحقًا)
+    renderProducts([]); // يضمن أن الشبكة تتهيأ بصريًا بدون عناصر
 
   }catch(err){
-    console.error('Failed to load categories/products (demo mode):', err);
+    console.error('Failed to load categories:', err);
+    // (اختياري) يمكنك إظهار رسالة أو fallback هنا إذا رغبت
   }
 })();
 
-
-// Mobile menu toggle
+/* ========= Mobile menu toggle ========= */
 const nav = document.querySelector('.nav');
 const burger = document.querySelector('.burger');
 if (burger && nav) {
@@ -140,4 +129,3 @@ if (burger && nav) {
     nav.classList.toggle('is-open');
   });
 }
-
