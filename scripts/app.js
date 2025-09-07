@@ -1,10 +1,10 @@
-// /scripts/app.js - COMPLETE FIXED VERSION
+// /scripts/app.js - COMPLETE FIXED VERSION (ENGLISH)
 import {
   fetchTopCategories,
   fetchCategoriesByParent,
   fetchAllProducts,
   fetchProductsByCategory,
-  fetchProductsByCategories, // مرة أخرى لأنها موجودة ومصححة في api.js
+  fetchProductsByCategories, // Re-added since it's fixed in api.js
 } from './api.js';
 
 /* ========= Year ========= */
@@ -130,12 +130,12 @@ function mapProducts(raw = []) {
   }));
 }
 
-// FIXED: أعد استخدام fetchProductsByCategories مع الإصلاح
+// FIXED: Re-using fetchProductsByCategories with the fix
 async function loadProducts({ categoryId = null, categoriesIn = null, page = 1 } = {}) {
   const grid = document.getElementById('productsGrid');
   if (grid) grid.innerHTML = '<div class="loading">Loading…</div>';
 
-  console.log('Loading products with params:', { categoryId, categoriesIn, page }); // للتشخيص
+  console.log('Loading products with params:', { categoryId, categoriesIn, page }); // For debugging
 
   let res;
   try {
@@ -150,22 +150,22 @@ async function loadProducts({ categoryId = null, categoriesIn = null, page = 1 }
       res = await fetchAllProducts({ page });
     }
 
-    console.log('Products API response:', res); // للتشخيص
+    console.log('Products API response:', res); // For debugging
 
     const raw = Array.isArray(res) ? res : (res?.data ?? res ?? []);
-    console.log('Raw products after processing:', raw); // للتشخيص
+    console.log('Raw products after processing:', raw); // For debugging
 
     const items = mapProducts(raw);
-    console.log('Mapped products:', items); // للتشخيص
+    console.log('Mapped products:', items); // For debugging
 
     if (items.length === 0) {
-      grid.innerHTML = '<div class="no-products">لا توجد منتجات في هذا القسم</div>';
+      grid.innerHTML = '<div class="no-products">No products found in this category</div>';
     } else {
       renderProducts(items);
     }
   } catch (error) {
     console.error('Error loading products:', error);
-    grid.innerHTML = '<div class="error">حدث خطأ في تحميل المنتجات</div>';
+    grid.innerHTML = '<div class="error">Error loading products</div>';
   }
 }
 
@@ -192,56 +192,56 @@ function setBackVisibility(parentId) {
 
 /* ========= Navigation (Categories/Sub-categories) - FIXED & IMPROVED ========= */
 async function loadCategories(parentId = null) {
-  console.log('Loading categories for parentId:', parentId); // للتشخيص
+  console.log('Loading categories for parentId:', parentId); // For debugging
   setBackVisibility(parentId);
 
   try {
     const res = parentId ? await fetchCategoriesByParent(parentId) : await fetchTopCategories();
     const raw = Array.isArray(res) ? res : (res?.data ?? res ?? []);
-    console.log('Categories response:', raw); // للتشخيص
+    console.log('Categories response:', raw); // For debugging
 
     if (parentId) {
-      // جمع IDs للأبناء المباشرين + الأب
+      // Collect IDs for direct children + parent
       const childIds = raw.map(c => (c?.id ?? c?._id ?? c?.uuid ?? c?.pk)).filter(Boolean);
       const allIds = [parentId, ...childIds];
-      console.log('All category IDs (parent + children):', allIds); // للتشخيص
+      console.log('All category IDs (parent + children):', allIds); // For debugging
 
-      // اعرض منتجات الأب + الأبناء (حسب المنطق الأصلي)
+      // Show products from parent + children (following original logic)
       await loadProducts({ categoriesIn: allIds, page: 1 });
 
-      // سكرول لقسم المنتجات
+      // Scroll to products section
       document.getElementById('products')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-      // لو ما في Sub-categories، نكتفي بالمنتجات
+      // If no sub-categories, just show products
       if (childIds.length === 0) {
         console.log('No subcategories found, showing only products');
         return;
       }
     } else {
-      // المستوى الأعلى: منتجات عامة
+      // Top level: general products
       await loadProducts({ page: 1 });
     }
 
-    // عرض كروت التصنيفات (إن وجدت)
+    // Display category cards (if any)
     const items = raw.map(c => ({
       id: c?.id ?? c?._id ?? c?.uuid ?? c?.pk ?? null,
       name: c?.name ?? 'Category',
       image: c?.thumb ?? c?.image ?? '',
       slug: c?.slug ?? ''
     }));
-    console.log('Mapped categories for display:', items); // للتشخيص
+    console.log('Mapped categories for display:', items); // For debugging
     renderCategories(items);
   } catch (error) {
     console.error('Error loading categories:', error);
     const grid = document.getElementById('categoriesGrid');
     if (grid) {
-      grid.innerHTML = '<div class="error">حدث خطأ في تحميل التصنيفات</div>';
+      grid.innerHTML = '<div class="error">Error loading categories</div>';
     }
   }
 }
 
 async function navigateToCategory(categoryId, slug) {
-  console.log('Navigating to category:', categoryId, slug); // للتشخيص
+  console.log('Navigating to category:', categoryId, slug); // For debugging
   history.pushState({ parentId: categoryId }, '', `#/categories/${categoryId}${slug ? ('/' + slug) : ''}`);
   await loadCategories(categoryId);
 }
@@ -254,7 +254,7 @@ if (categoriesGrid) {
     if (!card) return;
     const id = card.dataset.id;
     const slug = card.dataset.slug;
-    console.log('Category card clicked:', { id, slug }); // للتشخيص
+    console.log('Category card clicked:', { id, slug }); // For debugging
     if (!id) return console.warn('No category id on card. Check API mapping.');
     await navigateToCategory(id, slug);
   });
@@ -263,7 +263,7 @@ if (categoriesGrid) {
 /* Browser Back/Forward support */
 window.addEventListener('popstate', async (e) => {
   const parentId = e.state?.parentId ?? null;
-  console.log('Browser back/forward, parentId:', parentId); // للتشخيص
+  console.log('Browser back/forward, parentId:', parentId); // For debugging
   setBackVisibility(parentId);
   await loadCategories(parentId);
 });
@@ -271,11 +271,11 @@ window.addEventListener('popstate', async (e) => {
 /* ========= Boot ========= */
 (async () => {
   try {
-    console.log('Application starting...'); // للتشخيص
+    console.log('Application starting...'); // For debugging
     history.replaceState({ parentId: null }, '', '#/categories');
     setBackVisibility(null);
     await loadCategories(null);
-    console.log('Application loaded successfully'); // للتشخيص
+    console.log('Application loaded successfully'); // For debugging
   } catch (err) {
     console.error('Failed to load application:', err);
   }
