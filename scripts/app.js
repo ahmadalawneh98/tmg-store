@@ -3,7 +3,8 @@ import {
   fetchTopCategories,
   fetchCategoriesByParent,
   fetchAllProducts,
-  fetchProductsByCategory
+  fetchProductsByCategory,
+  fetchProductsByCategories, // NEW
 } from './api.js';
 
 /* ========= Year ========= */
@@ -129,13 +130,18 @@ function mapProducts(raw = []) {
   }));
 }
 
-async function loadProducts({ categoryId = null, page = 1 } = {}) {
+async function loadProducts({ categoryId = null, categoriesIn = null, page = 1 } = {}) {
   const grid = document.getElementById('productsGrid');
   if (grid) grid.innerHTML = '<div class="loading">Loading…</div>';
 
-  const res = categoryId
-    ? await fetchProductsByCategory(categoryId, { page })
-    : await fetchAllProducts({ page });
+  let res;
+  if (Array.isArray(categoriesIn) && categoriesIn.length) {
+    res = await fetchProductsByCategories(categoriesIn, { page });
+  } else if (categoryId) {
+    res = await fetchProductsByCategory(categoryId, { page });
+  } else {
+    res = await fetchAllProducts({ page });
+  }
 
   const raw = Array.isArray(res) ? res : (res?.data ?? res ?? []);
   const items = mapProducts(raw);
@@ -159,12 +165,10 @@ if (!backBtn) {
   }
 }
 backBtn.addEventListener('click', () => history.back());
-
 function setBackVisibility(parentId) {
   backBtn.style.display = parentId ? 'inline-block' : 'none';
 }
 
-/* ========= Navigation (Categories/Sub-categories) ========= */
 /* ========= Navigation (Categories/Sub-categories) ========= */
 async function loadCategories(parentId = null) {
   setBackVisibility(parentId);
@@ -172,36 +176,36 @@ async function loadCategories(parentId = null) {
   const res = parentId ? await fetchCategoriesByParent(parentId) : await fetchTopCategories();
   const raw = Array.isArray(res) ? res : (res?.data ?? res ?? []);
 
-  // 1) دائماً حمّل منتجات التصنيف المحدد (حتى لو عنده Sub-categories)
   if (parentId) {
-    // اعرض منتجات هذا التصنيف
-    await loadProducts({ categoryId: parentId, page: 1 });
-    // اختياري: انزل لقسم المنتجات
+    // IDs للأبناء المباشرين + الأب
+    const childIds = raw.map(c => (c?.id ?? c?._id ?? c?.uuid ?? c?.pk)).filter(Boolean);
+    const allIds = [parentId, ...childIds];
+
+    // اعرض منتجات الأب + الأبناء
+    await loadProducts({ categoriesIn: allIds, page: 1 });
+
+    // سكرول لقسم المنتجات
     document.getElementById('products')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // لو ما في Sub-categories، نكتفي بالمنتجات
+    if (childIds.length === 0) return;
   } else {
-    // في المستوى الأعلى، اعرض منتجات عامة (إن حاب ترجع تعرض الكل)
+    // المستوى الأعلى: منتجات عامة
     await loadProducts({ page: 1 });
   }
 
-  // 2) لو ما فيه Sub-categories، كملت تحميل المنتجات فوق وخلاص
-  if (parentId && raw.length === 0) {
-    return; // لا تعرض كروت Sub-categories لأنه ما فيه
-  }
-
-  // 3) اعرض كروت التصنيفات (لو فيه)
+  // عرض كروت التصنيفات (إن وجدت)
   const items = raw.map(c => ({
     id: c?.id ?? c?._id ?? c?.uuid ?? c?.pk ?? null,
     name: c?.name ?? 'Category',
     image: c?.thumb ?? c?.image ?? '',
     slug: c?.slug ?? ''
   }));
-
   renderCategories(items);
 }
 
 async function navigateToCategory(categoryId, slug) {
   history.pushState({ parentId: categoryId }, '', `#/categories/${categoryId}${slug ? ('/' + slug) : ''}`);
-  // ملاحظة: الآن loadCategories نفسه صار يجيب المنتجات دائماً، فنداء واحد يكفي
   await loadCategories(categoryId);
 }
 
@@ -230,8 +234,7 @@ window.addEventListener('popstate', async (e) => {
   try {
     history.replaceState({ parentId: null }, '', '#/categories');
     setBackVisibility(null);
-    await loadCategories(null);
-    await loadProducts({ page: 1 }); // عرض المنتجات العامة في قسم Products
+    await loadCategories(null); // هذه الدالة ستعرض أيضًا المنتجات العامة
   } catch (err) {
     console.error('Failed to load:', err);
   }
