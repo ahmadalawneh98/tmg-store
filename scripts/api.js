@@ -47,7 +47,7 @@ export async function fetchAllProducts({
   limit = 24,
   sort = 'created_at,DESC',
   fields = 'id,name,thumb,price,sale_price,slug,images,quantity',
-  join = '', 
+  join = '',
 } = {}) {
   const url = new URL(productsProxy, location.origin);
   url.searchParams.set('page', page);
@@ -65,12 +65,14 @@ export async function fetchAllProducts({
 }
 
 // منتجات حسب تصنيف واحد - FIXED
+// ملاحظة: عند استخدام join=categories لا ترسل categories ضمن fields حتى لا ترجع data:[] من الـ API.
 export async function fetchProductsByCategory(categoryId, {
   page = 1,
   limit = 24,
   sort = 'created_at,DESC',
-  fields = 'id,name,thumb,price,sale_price,slug,images,quantity,categories',
-  join = 'categories', // إضافة join للحصول على معلومات التصنيفات
+  // ⚠️ لا تضع "categories" ضمن fields عند استخدام join=categories
+  fields = 'id,name,thumb,price,sale_price,slug,images,quantity',
+  join = 'categories',
 } = {}) {
   const url = new URL(productsProxy, location.origin);
   url.searchParams.set('page', page);
@@ -79,8 +81,7 @@ export async function fetchProductsByCategory(categoryId, {
   if (fields) url.searchParams.set('fields', fields);
   if (join) url.searchParams.set('join', join);
 
-  // FIXED: استخدم categories.id بدلاً من category_id
-  // لأن المنتج يحتوي على مصفوفة categories حسب API documentation
+  // فلترة على العلاقة الصحيحة
   encodeFilters([
     ['categories.id', 'eq', String(categoryId)],
   ]).forEach(f => url.searchParams.append('filter', f));
@@ -97,12 +98,13 @@ export async function fetchProductsByCategory(categoryId, {
 }
 
 // منتجات حسب عدة تصنيفات ($in) — مفيد لعرض الأب + كل الأبناء/الأحفاد
+// ملاحظة: نفس القاعدة — لا ترسل "categories" ضمن fields مع join=categories.
 export async function fetchProductsByCategories(ids = [], {
   page = 1,
   limit = 24,
   sort = 'created_at,DESC',
-  fields = 'id,name,thumb,price,sale_price,slug,images,quantity,categories',
-  join   = 'categories' // مهم: نربط جدول/علاقة التصنيفات
+  fields = 'id,name,thumb,price,sale_price,slug,images,quantity',
+  join   = 'categories'
 } = {}) {
   const onlyIds = (ids || []).filter(Boolean).map(String);
   if (!onlyIds.length) {
@@ -117,7 +119,7 @@ export async function fetchProductsByCategories(ids = [], {
   if (fields) url.searchParams.set('fields', fields);
   if (join)   url.searchParams.set('join', join);
 
-  // ✔ حسب التوثيق: $in وعلى الحقل categories.id لأن المنتج لديه مصفوفة categories
+  // فلترة بـ $in على categories.id
   encodeFilters([
     ['categories.id', '$in', onlyIds.join(',')]
   ]).forEach(f => url.searchParams.append('filter', f));
