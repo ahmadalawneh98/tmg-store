@@ -1,4 +1,4 @@
-// /scripts/api.js - FIXED VERSION
+// /scripts/api.js - FIXED VERSION (with safe fallbacks)
 const proxy = '/api/categories';
 const productsProxy = '/api/products';
 
@@ -9,6 +9,10 @@ function encodeFilters(arr) {
   );
 }
 
+function toArrayData(res) {
+  return Array.isArray(res) ? res : (res?.data ?? res ?? []);
+}
+
 /* ========= Categories API ========= */
 export async function fetchTopCategories() {
   const url = new URL(proxy, location.origin);
@@ -17,12 +21,9 @@ export async function fetchTopCategories() {
     ['hidden', 'eq', 'false'],
   ]).forEach(f => url.searchParams.append('filter', f));
 
-  console.log('Fetching top categories:', url.toString()); // للتشخيص
   const r = await fetch(url.toString());
   if (!r.ok) throw new Error(await r.text());
-  const data = await r.json();
-  console.log('Top categories response:', data); // للتشخيص
-  return data;
+  return r.json();
 }
 
 export async function fetchCategoriesByParent(parentId) {
@@ -32,16 +33,15 @@ export async function fetchCategoriesByParent(parentId) {
     ['hidden', 'eq', 'false'],
   ]).forEach(f => url.searchParams.append('filter', f));
 
-  console.log('Fetching subcategories for parent:', parentId, url.toString()); // للتشخيص
   const r = await fetch(url.toString());
   if (!r.ok) throw new Error(await r.text());
-  const data = await r.json();
-  console.log('Subcategories response:', data); // للتشخيص
-  return data;
+  return r.json();
 }
 
 /* ========= Products API ========= */
-// جميع المنتجات (عام)
+/**
+ * يجلب المنتجات عامّة (بدون join)
+ */
 export async function fetchAllProducts({
   page = 1,
   limit = 24,
@@ -56,81 +56,160 @@ export async function fetchAllProducts({
   if (fields) url.searchParams.set('fields', fields);
   if (join) url.searchParams.set('join', join);
 
-  console.log('Fetching all products:', url.toString()); // للتشخيص
   const r = await fetch(url.toString());
   if (!r.ok) throw new Error(await r.text());
-  const data = await r.json();
-  console.log('All products response:', data); // للتشخيص
-  return data;
+  return r.json();
 }
 
-// منتجات حسب تصنيف واحد - FIXED
-// ملاحظة: عند استخدام join=categories لا ترسل categories ضمن fields حتى لا ترجع data:[] من الـ API.
-export async function fetchProductsByCategory(categoryId, {
-  page = 1,
-  limit = 24,
-  sort = 'created_at,DESC',
-  // ⚠️ لا تضع "categories" ضمن fields عند استخدام join=categories
-  fields = 'id,name,thumb,price,sale_price,slug,images,quantity',
-  join = 'categories',
+/* ======= Low-level helpers for categories join ======= */
+/**
+ * صفحة واحدة مع join=categories (بدون fields لتفادي data:[])
+ */
+export async function fetchProductsPageWithCategories({ page = 1, limit = 24 } = {}) {
+  const url = new URL(productsProxy, location.origin);
+  url.searchParams.set('page', String(page));
+  url.searchParams.set('limit', String(limit));
+  url.searchParams.set('sort', 'created_at,DESC');
+  url.searchParams.set('join', 'categories'); // ⚠️ لا نرسل fields هنا
+
+  const r = await fetch(url.toString());
+  if (!r.ok) throw new Error(await r.text());
+  const j = await r.json();
+  return {
+    data: toArrayData(j),
+    page: Number(j?.page ?? page) || page,
+    totalPages: Number(j?.totalPages ?? 1) || 1
+  };
+}
+
+/**
+ * يجلب عدة صفحات ثم يفلتر محليًا حسب categoryId أو slug
+ */
+export async function fetchProductsByCategoryClientSide({
+  categoryId = null,
+  slug = null,
+  maxPages = 10,
+  limit = 24
 } = {}) {
+  if (!categoryId && !slug) return { data: [] };
+
+  let page = 1;
+  const out = [];
+  let totalPages = 1;
+
+  do {
+    const { data, totalPages: tp } = await fetchProductsPageWithCategories({ page, limit });
+    out.push(...data);
+    totalPages = tp;
+    page += 1;
+  } while (page <= totalPages && page <= maxPages);
+
+  const filtered = out.filter(p => {
+    const cats = Array.isArray(p?.categories) ? p.categories : [];
+    return cats.some(c =>
+      (categoryId && String(c?.id) === String(categoryId)) ||
+      (slug && String(c?.slug) === String(slug))
+    );
+  });
+
+  return { data: filtered };
+}
+
+/* ======= Server-side attempts (may return empty on some setups) ======= */
+async function fetchProductsByCategoryServer(categoryId, { page = 1, limit = 24 } = {}) {
   const url = new URL(productsProxy, location.origin);
   url.searchParams.set('page', page);
   url.searchParams.set('limit', limit);
-  url.searchParams.set('sort', sort);
-  if (fields) url.searchParams.set('fields', fields);
-  if (join) url.searchParams.set('join', join);
+  url.searchParams.set('sort', 'created_at,DESC');
+  // ⚠️ لا ترسل "categories" ضمن fields مع join=categories
+  url.searchParams.set('fields', 'id,name,thumb,price,sale_price,slug,images,quantity');
+  url.searchParams.set('join', 'categories');
 
-  // فلترة على العلاقة الصحيحة
-  encodeFilters([
-    ['categories.id', 'eq', String(categoryId)],
-  ]).forEach(f => url.searchParams.append('filter', f));
+  // بعض البيئات لا تتعامل جيدًا مع $in لقيمة واحدة، جرّب eq:
+  url.searchParams.append('filter', `categories.id||eq||${String(categoryId)}`);
 
-  console.log('Fetching products by category:', categoryId, url.toString()); // للتشخيص
   const r = await fetch(url.toString());
-  if (!r.ok) {
-    console.error('Error fetching products by category:', await r.text());
-    throw new Error(await r.text());
-  }
-  const data = await r.json();
-  console.log('Products by category response:', data); // للتشخيص
-  return data;
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
 }
 
-// منتجات حسب عدة تصنيفات ($in) — مفيد لعرض الأب + كل الأبناء/الأحفاد
-// ملاحظة: نفس القاعدة — لا ترسل "categories" ضمن fields مع join=categories.
+async function fetchProductsByCategoriesServer(ids = [], { page = 1, limit = 24 } = {}) {
+  const onlyIds = (ids || []).filter(Boolean).map(String);
+  const url = new URL(productsProxy, location.origin);
+  url.searchParams.set('page', page);
+  url.searchParams.set('limit', limit);
+  url.searchParams.set('sort', 'created_at,DESC');
+  url.searchParams.set('fields', 'id,name,thumb,price,sale_price,slug,images,quantity');
+  url.searchParams.set('join', 'categories');
+
+  const op = onlyIds.length === 1 ? 'eq' : '$in';
+  url.searchParams.append('filter', `categories.id||${op}||${op === '$in' ? onlyIds.join(',') : onlyIds[0]}`);
+
+  const r = await fetch(url.toString());
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+/* ========= High-level APIs (with fallback to client-side filtering) ========= */
+/**
+ * منتجات حسب تصنيف واحد:
+ * - يحاول فلترة السيرفر أولًا
+ * - إن رجع فاضي: يستخدم فلترة محلية عبر جلب صفحات مع join=categories
+ */
+export async function fetchProductsByCategory(categoryId, {
+  page = 1,
+  limit = 24,
+  sort = 'created_at,DESC', // غير مستخدم في fallback لكن نُبقيه للتناسق
+  // ⚠️ لا نضع "categories" ضمن fields عندما نستخدم join=categories
+  fields = 'id,name,thumb,price,sale_price,slug,images,quantity',
+  join = 'categories',
+  slug = null,          // يمكن تمرير slug لاستخدامه في fallback
+  maxPages = 10         // عدد صفحات أقصى للـ fallback
+} = {}) {
+  try {
+    const sr = await fetchProductsByCategoryServer(categoryId, { page, limit });
+    const data = toArrayData(sr);
+    if (data.length) return { data };
+    // fallback
+    const fb = await fetchProductsByCategoryClientSide({ categoryId, slug, maxPages, limit });
+    return fb;
+  } catch (e) {
+    // في حالة خطأ من السيرفر، جرّب fallback مباشرة
+    const fb = await fetchProductsByCategoryClientSide({ categoryId, slug, maxPages, limit });
+    return fb;
+  }
+}
+
+/**
+ * منتجات حسب عدة تصنيفات (أب + أبناء):
+ * - يحاول فلترة السيرفر ($in/eq)
+ * - إن رجع فاضي: يجلب صفحات ويُفلتر محليًا على المعرّفات المرسلة
+ */
 export async function fetchProductsByCategories(ids = [], {
   page = 1,
   limit = 24,
   sort = 'created_at,DESC',
   fields = 'id,name,thumb,price,sale_price,slug,images,quantity',
-  join   = 'categories'
+  join   = 'categories',
+  maxPages = 10
 } = {}) {
   const onlyIds = (ids || []).filter(Boolean).map(String);
-  if (!onlyIds.length) {
-    console.log('No valid category IDs provided to fetchProductsByCategories');
-    return [];
+  if (!onlyIds.length) return { data: [] };
+
+  try {
+    const sr = await fetchProductsByCategoriesServer(onlyIds, { page, limit });
+    const data = toArrayData(sr);
+    if (data.length) return { data };
+    // fallback: فلترة محلية
+    const { data: pages } = await fetchProductsByCategoryClientSide({ categoryId: onlyIds[0], maxPages, limit });
+    const setIds = new Set(onlyIds.map(String));
+    const filtered = (pages || []).filter(p => (p?.categories || []).some(c => setIds.has(String(c?.id))));
+    return { data: filtered };
+  } catch (e) {
+    // لو فشل السيرفر، نفّذ fallback
+    const { data: pages } = await fetchProductsByCategoryClientSide({ categoryId: onlyIds[0], maxPages, limit });
+    const setIds = new Set(onlyIds.map(String));
+    const filtered = (pages || []).filter(p => (p?.categories || []).some(c => setIds.has(String(c?.id))));
+    return { data: filtered };
   }
-
-  const url = new URL(productsProxy, location.origin);
-  url.searchParams.set('page', page);
-  url.searchParams.set('limit', limit);
-  url.searchParams.set('sort', sort);
-  if (fields) url.searchParams.set('fields', fields);
-  if (join)   url.searchParams.set('join', join);
-
-  // فلترة بـ $in على categories.id
-  encodeFilters([
-    ['categories.id', '$in', onlyIds.join(',')]
-  ]).forEach(f => url.searchParams.append('filter', f));
-
-  console.log('Fetching products by categories:', onlyIds, url.toString()); // للتشخيص
-  const r = await fetch(url.toString());
-  if (!r.ok) {
-    console.error('Error fetching products by categories:', await r.text());
-    throw new Error(await r.text());
-  }
-  const data = await r.json();
-  console.log('Products by categories response:', data); // للتشخيص
-  return data;
 }
