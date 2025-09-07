@@ -113,7 +113,7 @@ let backBtn = document.getElementById('backBtn');
 if (!backBtn) {
   backBtn = document.createElement('button');
   backBtn.id = 'backBtn';
-  backBtn.textContent = '← Back';
+  backBtn.textContent = 'Back';
   backBtn.className = 'back-btn';
   backBtn.style.display = 'none'; // hidden by default
 
