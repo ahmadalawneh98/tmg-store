@@ -165,19 +165,30 @@ function setBackVisibility(parentId) {
 }
 
 /* ========= Navigation (Categories/Sub-categories) ========= */
+/* ========= Navigation (Categories/Sub-categories) ========= */
 async function loadCategories(parentId = null) {
   setBackVisibility(parentId);
 
   const res = parentId ? await fetchCategoriesByParent(parentId) : await fetchTopCategories();
   const raw = Array.isArray(res) ? res : (res?.data ?? res ?? []);
 
-  // لا يوجد تصنيفات فرعية → اعرض منتجات التصنيف
-  if (parentId && raw.length === 0) {
+  // 1) دائماً حمّل منتجات التصنيف المحدد (حتى لو عنده Sub-categories)
+  if (parentId) {
+    // اعرض منتجات هذا التصنيف
     await loadProducts({ categoryId: parentId, page: 1 });
-    document.getElementById('products')?.scrollIntoView({ behavior:'smooth', block:'start' });
-    return;
+    // اختياري: انزل لقسم المنتجات
+    document.getElementById('products')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } else {
+    // في المستوى الأعلى، اعرض منتجات عامة (إن حاب ترجع تعرض الكل)
+    await loadProducts({ page: 1 });
   }
 
+  // 2) لو ما فيه Sub-categories، كملت تحميل المنتجات فوق وخلاص
+  if (parentId && raw.length === 0) {
+    return; // لا تعرض كروت Sub-categories لأنه ما فيه
+  }
+
+  // 3) اعرض كروت التصنيفات (لو فيه)
   const items = raw.map(c => ({
     id: c?.id ?? c?._id ?? c?.uuid ?? c?.pk ?? null,
     name: c?.name ?? 'Category',
@@ -190,6 +201,7 @@ async function loadCategories(parentId = null) {
 
 async function navigateToCategory(categoryId, slug) {
   history.pushState({ parentId: categoryId }, '', `#/categories/${categoryId}${slug ? ('/' + slug) : ''}`);
+  // ملاحظة: الآن loadCategories نفسه صار يجيب المنتجات دائماً، فنداء واحد يكفي
   await loadCategories(categoryId);
 }
 
