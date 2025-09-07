@@ -1,6 +1,5 @@
 // scripts/app.js
-// ✅ تفعيل الجلب الحقيقي للأقسام
-import { fetchTopCategories } from './api.js';
+import { fetchTopCategories, fetchCategoriesByParent } from './api.js';
 
 /* ========= Year ========= */
 document.getElementById('y').textContent = new Date().getFullYear();
@@ -74,8 +73,15 @@ function renderCategories(items=[]){
   const grid = document.getElementById('categoriesGrid');
   grid.innerHTML = '';
   const tpl = document.getElementById('categoryCardTpl').content;
+
   items.forEach(it=>{
     const n = tpl.cloneNode(true);
+    const card = n.querySelector('.card');
+    // خزّن البيانات على العنصر للنقر
+    card.dataset.id   = it.id ?? '';
+    card.dataset.slug = it.slug ?? '';
+    card.style.cursor = 'pointer';
+
     n.querySelector('img').src = it.image || '';
     n.querySelector('img').alt = it.name || 'Category';
     n.querySelector('.title').textContent = it.name || 'Category';
@@ -99,25 +105,65 @@ function renderProducts(items=[]){
   attachTilt(grid);
 }
 
+/* ========= Navigation (Categories/Sub-categories) ========= */
+async function loadCategories(parentId = null){
+  const res = parentId ? await fetchCategoriesByParent(parentId) : await fetchTopCategories();
+  const raw = Array.isArray(res) ? res : (res?.data ?? res ?? []);
+
+  // لو ما في Sub-categories → هنا لاحقًا نجلب المنتجات
+  if (parentId && raw.length === 0) {
+    console.log('[Sub-categories] none → TODO: load products by category:', parentId);
+    renderProducts([]);
+    return;
+  }
+
+  const items = raw.map(c => ({
+    id:    c?.id ?? c?._id ?? c?.uuid ?? c?.pk ?? null,
+    name:  c?.name ?? 'Category',
+    image: c?.thumb ?? c?.image ?? '',
+    slug:  c?.slug ?? ''
+  }));
+
+  console.log('[Categories loaded]', { parentId, count: items.length, sample: items[0] });
+  renderCategories(items);
+}
+
+async function navigateToCategory(categoryId, slug){
+  history.pushState({ parentId: categoryId }, '', `#/categories/${categoryId}${slug?('/'+slug):''}`);
+  await loadCategories(categoryId);
+}
+
+/* تفويض أحداث النقر من الحاوية */
+const categoriesGrid = document.getElementById('categoriesGrid');
+if (categoriesGrid){
+  categoriesGrid.addEventListener('click', async (e) => {
+    const card = e.target.closest('.card');
+    if (!card) return;
+    const id   = card.dataset.id;
+    const slug = card.dataset.slug;
+    console.log('[Category click]', { id, slug });
+    if (!id){
+      console.warn('No category id on card. Check API mapping.');
+      return;
+    }
+    await navigateToCategory(id, slug);
+  });
+}
+
+/* دعم زر الرجوع */
+window.addEventListener('popstate', async (e)=>{
+  const parentId = e.state?.parentId ?? null;
+  await loadCategories(parentId);
+});
+
 /* ========= Boot ========= */
 (async ()=>{
   try{
-    // ✅ جلب الأقسام من EasyOrders (حسب الوثائق: name, slug, thumb, ...)
-    const data = await fetchTopCategories();
-    const raw = Array.isArray(data) ? data : (data?.data ?? data ?? []);
-    const categories = raw.map(c => ({
-      name:  c?.name ?? 'Category',
-      image: c?.thumb ?? c?.image ?? '',
-      slug:  c?.slug ?? null
-    }));
-    renderCategories(categories);
-
-    // 🛒 المنتجات: نتركها فاضية الآن (نربطها سوا لاحقًا)
-    renderProducts([]); // يضمن أن الشبكة تتهيأ بصريًا بدون عناصر
-
+    history.replaceState({ parentId: null }, '', '#/categories');
+    await loadCategories(null);   // Top-level
+    renderProducts([]);           // فاضي الآن
   }catch(err){
     console.error('Failed to load categories:', err);
-    // (اختياري) يمكنك إظهار رسالة أو fallback هنا إذا رغبت
   }
 })();
 
@@ -125,7 +171,5 @@ function renderProducts(items=[]){
 const nav = document.querySelector('.nav');
 const burger = document.querySelector('.burger');
 if (burger && nav) {
-  burger.addEventListener('click', () => {
-    nav.classList.toggle('is-open');
-  });
+  burger.addEventListener('click', () => nav.classList.toggle('is-open'));
 }

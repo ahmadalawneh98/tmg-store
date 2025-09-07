@@ -10,20 +10,20 @@ export default async function handler(req, res) {
   const API_BASE = 'https://api.easy-orders.net/api/v1/external-apps/categories/';
   const API_KEY = process.env.EASY_ORDERS_API_KEY;
 
-  const { filter } = req.query; // NOTE: اسم الباراميتر filter
+  const { filter, filters } = req.query; // ← ندعم الاثنين
   const url = new URL(API_BASE);
 
-  // ادعم تكرار filter
-  if (Array.isArray(filter)) {
-    filter.forEach(f => url.searchParams.append('filter', f));
-  } else if (typeof filter === 'string') {
-    url.searchParams.append('filter', filter);
-  }
+  const appendFilter = (val) => url.searchParams.append('filter', val);
+  if (Array.isArray(filter)) filter.forEach(appendFilter);
+  else if (typeof filter === 'string') appendFilter(filter);
+
+  if (Array.isArray(filters)) filters.forEach(appendFilter);
+  else if (typeof filters === 'string') appendFilter(filters);
 
   try {
     const r = await fetch(url.toString(), {
       headers: {
-        'Api-Key': API_KEY,                 // ← مهم
+        'Api-Key': API_KEY,
         'Accept': 'application/json'
       }
     });
