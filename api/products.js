@@ -10,12 +10,11 @@ export default async function handler(req, res) {
   const API_BASE = 'https://api.easy-orders.net/api/v1/external-apps/products';
   const API_KEY = process.env.EASY_ORDERS_API_KEY;
 
-  // ✅ أولاً: دعم جلب منتج واحد بالـ id
+  // ✅ get-one by id (NO join here)
   const { id } = req.query;
   if (id) {
     try {
-      const join = req.query.join ? `?join=${encodeURIComponent(String(req.query.join))}` : '';
-      const url = `${API_BASE}/${encodeURIComponent(String(id))}${join}`;
+      const url = `${API_BASE}/${encodeURIComponent(String(id))}`; // ← no join
       console.log('[ProductsProxy:get-one] →', url);
 
       const r = await fetch(url, {
@@ -33,15 +32,15 @@ export default async function handler(req, res) {
     }
   }
 
-  // خلاف ذلك: قائمة المنتجات مع كل البارامترات
+  // 🔁 products list with pass-through params
   try {
     const url = new URL(API_BASE);
 
-    // مرّر الأساسيات
-    const pass = ['page','limit','sort','fields','join'];
+    // pass basics
+    const pass = ['page', 'limit', 'sort', 'fields', 'join'];
     for (const k of pass) if (req.query[k]) url.searchParams.set(k, String(req.query[k]));
 
-    // filters و filter (كلاهما مدعومان)
+    // support filter / filters
     const append = v => url.searchParams.append('filter', v);
     const { filter, filters } = req.query;
     if (Array.isArray(filter)) filter.forEach(append);
@@ -49,7 +48,7 @@ export default async function handler(req, res) {
     if (Array.isArray(filters)) filters.forEach(append);
     else if (typeof filters === 'string') append(filters);
 
-    // مرّر أي بارامترات أخرى بدون ما تدعس على المذكورة
+    // forward any other params (excluding ones already handled)
     for (const [k, v] of Object.entries(req.query)) {
       if (pass.includes(k) || k === 'filter' || k === 'filters' || k === 'id') continue;
       if (Array.isArray(v)) v.forEach(x => url.searchParams.append(k, x));

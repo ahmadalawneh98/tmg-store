@@ -174,59 +174,61 @@ async function loadProduct({ productId = null, slug = null } = {}) {
   box.innerHTML = '<div class="loading">Loading product…</div>';
 
   try {
-    // 1) Fetch get-one product (via your /api/products proxy)
-    let p;
-    if (productId) {
-      const r = await fetch(`/api/products?id=${encodeURIComponent(productId)}&join=categories,variations,variants`);
-      if (!r.ok) throw new Error(await r.text());
-      p = await r.json();                        // ← كائن منتج واحد
-    } else if (slug) {
+    // helper: رجّع id من slug عبر طلب قائمة خفيفة
+    async function resolveIdBySlug(sl) {
       const url = new URL('/api/products', location.origin);
-      url.searchParams.append('filter', `slug||eq||${slug}`);
+      url.searchParams.set('fields', 'id,slug');        // خفيف
       url.searchParams.set('limit', '1');
-      url.searchParams.set('join', 'categories,variations,variants');
+      url.searchParams.append('filter', `slug||eq||${sl}`);
       const r = await fetch(url.toString());
       if (!r.ok) throw new Error(await r.text());
       const j = await r.json();
-      p = (Array.isArray(j) ? j : (j?.data ?? []))[0] || null;
+      const arr = Array.isArray(j) ? j : (j?.data ?? []);
+      return arr[0]?.id ?? arr[0]?._id ?? arr[0]?.uuid ?? null;
     }
+
+    let p;
+    if (!productId && slug) {
+      productId = await resolveIdBySlug(slug);
+    }
+    if (productId) {
+      // get-one بدون join (الـ API يعيد variations/variants ضمن الاستجابة الافتراضية)
+      const r = await fetch(`/api/products?id=${encodeURIComponent(productId)}`);
+      if (!r.ok) throw new Error(await r.text());
+      p = await r.json();
+    }
+
     if (!p) { box.innerHTML = '<div class="error">Product not found</div>'; return; }
 
-    // 2) Normalize
-    const basePrice = Number(p.price || 0);
-    const salePrice = Number(p.sale_price || 0);
-    const gallery   = Array.isArray(p.images) && p.images.length ? p.images : (p.thumb ? [p.thumb] : []);
-    const cats      = Array.isArray(p.categories) ? p.categories : [];
-    const variations = Array.isArray(p.variations) ? p.variations : [];
-    const variants   = Array.isArray(p.variants)   ? p.variants   : [];
+    // --- تطبيع البيانات ---
+    const basePrice   = Number(p.price || 0);
+    const salePrice   = Number(p.sale_price || 0);
+    const gallery     = Array.isArray(p.images) && p.images.length ? p.images : (p.thumb ? [p.thumb] : []);
+    const cats        = Array.isArray(p.categories) ? p.categories : [];
+    const variations  = Array.isArray(p.variations) ? p.variations : [];
+    const variants    = Array.isArray(p.variants)   ? p.variants   : [];
 
-    // 3) Selection state
-    const selected = {};          // { [variationName]: value }
-    let selectedVariant = null;   // matched variant object
+    // حالة الاختيار + مطابقة الفاريانت
+    const selected = {};
+    let selectedVariant = null;
 
     function matchVariant() {
       if (!variations.length || !variants.length) return null;
-      // يجب اختيار جميع الـ variations
       for (const v of variations) if (!selected[v.name]) return null;
       return variants.find(v => {
         const props = Array.isArray(v.variation_props) ? v.variation_props : [];
-        return Object.entries(selected).every(([name, val]) =>
+        return Object.entries(selected).every(([name,val]) =>
           props.some(pp => String(pp.variation) === String(name) && String(pp.variation_prop) === String(val))
         );
       }) || null;
     }
-
     function currentPrice() {
-      // لو فيه variant مطابق استخدم سعره، وإلا استخدم سعر المنتج (مع خصم إن وجد)
       if (selectedVariant) {
-        const vp = Number(selectedVariant.sale_price || 0) > 0
-          ? Number(selectedVariant.sale_price)
-          : Number(selectedVariant.price || basePrice);
-        return vp;
+        const sp = Number(selectedVariant.sale_price || 0);
+        return sp > 0 ? sp : Number(selectedVariant.price || basePrice);
       }
-      return Number(salePrice || 0) > 0 ? salePrice : basePrice;
+      return salePrice > 0 ? salePrice : basePrice;
     }
-
     function stockLabel() {
       if (selectedVariant) {
         const q = Number(selectedVariant.quantity || 0);
@@ -239,62 +241,55 @@ async function loadProduct({ productId = null, slug = null } = {}) {
       return 'Available';
     }
 
-    // 4) Render variations UI
-   function renderVariations() {
-  if (!variations.length) return '';
+    // ——— UI للـ variations (نسخة مرنة) ———
+    function renderVariations() {
+      if (!variations.length) return '';
+      const blocks = variations.map(v => {
+        const rawProps =
+          Array.isArray(v.props)   ? v.props :
+          Array.isArray(v.values)  ? v.values :
+          Array.isArray(v.options) ? v.options : [];
+        const props = rawProps.map(pr => ({
+          name:  pr.name ?? pr.label ?? pr.value ?? '',
+          value: pr.value ?? pr.name  ?? pr.label ?? ''
+        })).filter(p => p.value !== '');
 
-  const blocks = variations.map(v => {
-    // اجلب المصفوفة مهما كان اسم الحقل
-    const rawProps =
-      Array.isArray(v.props)   ? v.props :
-      Array.isArray(v.values)  ? v.values :
-      Array.isArray(v.options) ? v.options : [];
+        if (!props.length) return '';
+        const type = String(v.type || 'buttons').toLowerCase();
 
-    // طبّع العناصر إلى شكل موحّد {name, value}
-    const props = rawProps.map(pr => ({
-      name:  pr.name ?? pr.label ?? pr.value ?? '',
-      value: pr.value ?? pr.name  ?? pr.label ?? ''
-    })).filter(p => p.value !== '');
+        if (type === 'dropdown') {
+          const opts = ['<option value="">— Select —</option>']
+            .concat(props.map(pr => `<option value="${pr.value}">${pr.name}</option>`))
+            .join('');
+          return `
+            <label class="var-block dropdown">
+              <div class="var-title">${v.name}</div>
+              <select class="var-select" data-vname="${v.name}">
+                ${opts}
+              </select>
+            </label>
+          `;
+        }
 
-    if (!props.length) return '';
+        const btns = props.map(pr => `
+          <button type="button" class="var-btn" data-vname="${v.name}" data-vval="${pr.value}">
+            ${pr.name}
+          </button>
+        `).join('');
+        return `
+          <div class="var-block ${type}">
+            <div class="var-title">${v.name}</div>
+            <div class="var-options">${btns}</div>
+          </div>
+        `;
+      }).join('');
 
-    const type = String(v.type || 'buttons').toLowerCase();
-
-    if (type === 'dropdown') {
-      const opts = ['<option value="">— Select —</option>']
-        .concat(props.map(pr => `<option value="${pr.value}">${pr.name}</option>`))
-        .join('');
-      return `
-        <label class="var-block dropdown">
-          <div class="var-title">${v.name}</div>
-          <select class="var-select" data-vname="${v.name}">
-            ${opts}
-          </select>
-        </label>
-      `;
+      return blocks.trim()
+        ? `<div class="pd-variations"><h4>Options</h4>${blocks}</div>`
+        : '';
     }
 
-    // buttons / color
-    const btns = props.map(pr => `
-      <button type="button" class="var-btn" data-vname="${v.name}" data-vval="${pr.value}">
-        ${pr.name}
-      </button>
-    `).join('');
-
-    return `
-      <div class="var-block ${type}">
-        <div class="var-title">${v.name}</div>
-        <div class="var-options">${btns}</div>
-      </div>
-    `;
-  }).join('');
-
-  // لو لم ينتج أي بلوك بعد التطبيع، لا تعرض القسم
-  if (!blocks.trim()) return '';
-  return `<div class="pd-variations"><h4>Options</h4>${blocks}</div>`;
-}
-
-    // 5) Page HTML
+    // ——— صفحة المنتج ———
     box.innerHTML = `
       <article class="product-details card-xl">
         <div class="pd-media">
@@ -309,7 +304,6 @@ async function loadProduct({ productId = null, slug = null } = {}) {
 
         <div class="pd-body">
           <h2>${p.name || 'Product'}</h2>
-
           <div class="pd-meta">
             <div class="pd-price" id="pdPrice"></div>
             <div class="pd-stock" id="pdStock"></div>
@@ -330,7 +324,7 @@ async function loadProduct({ productId = null, slug = null } = {}) {
       </article>
     `;
 
-    // 6) thumbs switch
+    // thumbs
     const thumbs = box.querySelectorAll('.pd-thumb');
     const imgs   = box.querySelectorAll('.pd-img');
     thumbs.forEach(t=>{
@@ -343,7 +337,7 @@ async function loadProduct({ productId = null, slug = null } = {}) {
       });
     });
 
-    // 7) price/stock refresh
+    // تحديث السعر/المخزون
     function refreshMeta() {
       selectedVariant = matchVariant();
       const priceNode = box.querySelector('#pdPrice');
@@ -356,30 +350,24 @@ async function loadProduct({ productId = null, slug = null } = {}) {
       }
       stockNode.textContent = stockLabel();
 
-      // تفعيل/تعطيل زر المتابعة لو المنتج غير متاح
       const proceed = box.querySelector('#proceedBtn');
-      const out = stockNode.textContent.toLowerCase().includes('out of stock');
-      proceed.disabled = out;
+      proceed.disabled = stockNode.textContent.toLowerCase().includes('out of stock');
     }
     refreshMeta();
 
-    // 8) variations handlers
-    // dropdowns
+    // events للـ variations
     box.querySelectorAll('.var-select').forEach(sel=>{
       sel.addEventListener('change', ()=>{
         const name = sel.dataset.vname;
         const val  = sel.value || null;
-        if (val) selected[name] = val;
-        else delete selected[name];
+        if (val) selected[name] = val; else delete selected[name];
         refreshMeta();
       });
     });
-    // buttons
     box.querySelectorAll('.var-btn').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const vname = btn.dataset.vname;
         const vval  = btn.dataset.vval;
-        // toggle active within same group
         btn.closest('.var-block')?.querySelectorAll('.var-btn').forEach(b=>b.classList.remove('active'));
         btn.classList.add('active');
         selected[vname] = vval;
@@ -387,26 +375,20 @@ async function loadProduct({ productId = null, slug = null } = {}) {
       });
     });
 
-    // 9) proceed to checkout (no WhatsApp; just save draft for real API later)
+    // متابعة الدفع (مسودة فقط الآن)
     box.querySelector('#proceedBtn')?.addEventListener('click', ()=>{
-      // تأكد من اختيار كل الـ variations إن وُجدت
       if (variations.length) {
         const missing = variations.filter(v => !selected[v.name]).map(v=>v.name);
-        if (missing.length) {
-          alert(`Please select: ${missing.join(', ')}`);
-          return;
-        }
+        if (missing.length) { alert(`Please select: ${missing.join(', ')}`); return; }
       }
-
-      // جهّز مسودة الطلب
       const draft = {
         product: {
           id: p.id || p._id || p.uuid || null,
           slug: p.slug || null,
           name: p.name || '',
-          thumb: p.thumb || (Array.isArray(p.images) ? p.images[0] : ''),
+          thumb: p.thumb || (Array.isArray(p.images) ? p.images[0] : '')
         },
-        selections: { ...selected },              // قيم variations المختارة
+        selections: { ...selected },
         variant: selectedVariant ? {
           id: selectedVariant.id || null,
           taager_code: selectedVariant.taager_code || null,
@@ -418,19 +400,11 @@ async function loadProduct({ productId = null, slug = null } = {}) {
         price: currentPrice(),
         quantity: 1
       };
-
-      // خزّنها لاستخدام صفحة /checkout لاحقًا (سنكمل API للشراء هناك)
       try { sessionStorage.setItem('checkoutDraft', JSON.stringify(draft)); } catch {}
-      window.dispatchEvent(new CustomEvent('checkout:draft', { detail: draft }));
-
-      // انتقل لصفحة الدفع (SPA)
-      const target = `#/checkout/${p.slug || (p.id || '')}`;
-      history.pushState({ view: 'checkout', draft }, '', target);
-      // هنا يمكنك إظهار/تحميل صفحة checkout الفعلية
+      history.pushState({ view: 'checkout', draft }, '', `#/checkout/${p.slug || (p.id || '')}`);
       alert('Draft saved. Implement real checkout API next.');
     });
 
-    // 10) back
     document.getElementById('pdBack')?.addEventListener('click', () => history.back());
   } catch (err) {
     console.error(err);
