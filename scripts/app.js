@@ -167,61 +167,98 @@ async function navigateToProduct(productId, slug) {
   await loadProduct({ productId, slug });
 }
 
+// ====== REPLACE your current loadProduct with this version ======
 async function loadProduct({ productId = null, slug = null } = {}) {
-  // أظهر صفحة المنتج فقط
   showView('product');
-
   const box = document.getElementById('productDetails');
   box.innerHTML = '<div class="loading">Loading product…</div>';
 
   try {
+    // --- fetch product with deep joins (best effort) ---
     let p;
-
-    // نفضّل slug لأنه يعمل حتى بدون دعم ?id= في البروكسي
     if (slug) {
       const url = new URL('/api/products', location.origin);
       url.searchParams.append('filter', `slug||eq||${slug}`);
       url.searchParams.set('limit', '1');
-      url.searchParams.set('join', 'categories,variations,variants'); // ⬅️ مهم
+      url.searchParams.set('join', 'categories,variations,variants,custom_fields');
       const r = await fetch(url.toString());
       if (!r.ok) throw new Error(await r.text());
       const j = await r.json();
       p = (Array.isArray(j) ? j : (j?.data ?? []))[0] || null;
     } else if (productId) {
-      // جلب منتج واحد عبر id (يتطلب دعم ?id= في /api/products)
-      const r = await fetch(`/api/products?id=${encodeURIComponent(productId)}&join=categories,variations,variants`);
+      const r = await fetch(`/api/products?id=${encodeURIComponent(productId)}&join=categories,variations,variants,custom_fields`);
       if (!r.ok) throw new Error(await r.text());
-      p = await r.json(); // يرجع كائن المنتج مباشرة
+      p = await r.json();
     }
+    if (!p) { box.innerHTML = '<div class="error">Product not found</div>'; return; }
 
-    if (!p) {
-      box.innerHTML = '<div class="error">Product not found</div>';
-      return;
-    }
-
-    // --- تحضير البيانات ---
+    // --- helpers & normalized data ---
     const basePrice = Number(p.price || 0);
     const salePrice = Number(p.sale_price || 0);
-    const price = salePrice > 0 ? salePrice : basePrice;
-
-    const gallery =
-      Array.isArray(p.images) && p.images.length ? p.images
-      : (p.thumb ? [p.thumb] : []);
-
+    const gallery = Array.isArray(p.images) && p.images.length ? p.images : (p.thumb ? [p.thumb] : []);
     const cats = Array.isArray(p.categories) ? p.categories : [];
-    const inStock = p.track_stock ? Number(p.quantity || 0) > 0 : true;
 
-    // توليد واجهة الاختيارات (variations)
-    function renderVariations(prod) {
-      const vars = Array.isArray(prod.variations) ? prod.variations : [];
-      if (!vars.length) return '';
+    const variations = Array.isArray(p.variations) ? p.variations : [];
+    const variants   = Array.isArray(p.variants)   ? p.variants   : [];
 
-      const blocks = vars.map(v => {
+    // custom fields (names may differ across stores)
+    const customFields =
+      Array.isArray(p.custom_fields) ? p.custom_fields :
+      Array.isArray(p.form_fields)   ? p.form_fields   :
+      Array.isArray(p.fields)        ? p.fields        :
+      []; // fallback: empty
+
+    // selected state
+    const selected = {}; // { [variationName]: value }
+    let selectedVariant = null;
+
+    // find variant by current selections
+    function pickMatchingVariant() {
+      if (!variations.length || !variants.length) return null;
+      // require all variation names chosen
+      for (const v of variations) {
+        if (!selected[v.name]) return null;
+      }
+      // match
+      return variants.find(v => {
+        const props = Array.isArray(v.variation_props) ? v.variation_props : [];
+        // all picked names/values must exist in variant.variation_props
+        return Object.entries(selected).every(([vName, vVal]) =>
+          props.some(pp => String(pp.variation) === String(vName) && String(pp.variation_prop) === String(vVal))
+        );
+      }) || null;
+    }
+
+    function currentPrice() {
+      const v = selectedVariant;
+      const pr = v ? Number(v.sale_price || 0) > 0 ? Number(v.sale_price) : Number(v.price || basePrice) : basePrice;
+      return Number(salePrice || 0) > 0 && !v ? salePrice : pr;
+    }
+
+    function stockLabel() {
+      if (selectedVariant) {
+        const q = Number(selectedVariant.quantity || 0);
+        return q > 0 ? `In stock • ${q}` : 'Out of stock';
+      }
+      if (p.track_stock) {
+        const q = Number(p.quantity || 0);
+        return q > 0 ? `In stock • ${q}` : 'Out of stock';
+      }
+      return 'Available';
+    }
+
+    // render variations UI
+    function renderVariations() {
+      if (!variations.length) return '';
+      const blocks = variations.map(v => {
         const props = Array.isArray(v.props) ? v.props : [];
-        const typeClass = (v.type || 'buttons'); // dropdown/buttons/color
-        const btns = props.map(pr =>
-          `<button class="var-btn" data-var="${v.name}" data-val="${pr.value}">${pr.name || pr.value}</button>`
-        ).join('');
+        if (!props.length) return ''; // skip empty
+        const btns = props.map(pr => {
+          const val = pr.value ?? pr.name ?? '';
+          const active = selected[v.name] && String(selected[v.name]) === String(val);
+          return `<button class="var-btn ${active ? 'active' : ''}" data-vname="${v.name}" data-vval="${val}">${pr.name || pr.value}</button>`;
+        }).join('');
+        const typeClass = v.type || 'buttons';
         return `
           <div class="var-block ${typeClass}">
             <div class="var-title">${v.name}</div>
@@ -229,55 +266,68 @@ async function loadProduct({ productId = null, slug = null } = {}) {
           </div>
         `;
       }).join('');
-
       return `<div class="pd-variations"><h4>Options</h4>${blocks}</div>`;
     }
 
-    // --- بناء صفحة المنتج ---
+    // render custom text inputs if any
+    function renderCustomFields() {
+      if (!customFields.length) return '';
+      const inputs = customFields.map((f,i) => {
+        const label = f.label || f.name || `Field ${i+1}`;
+        const ph    = f.placeholder || label;
+        const type  = (f.type || 'text') === 'textarea' ? 'textarea' : 'input';
+        const req   = f.required ? 'required' : '';
+        const name  = f.name || `field_${i}`;
+        if (type === 'textarea') {
+          return `
+            <label class="cf">
+              <span>${label}${f.required?' *':''}</span>
+              <textarea name="${name}" placeholder="${ph}" ${req}></textarea>
+            </label>
+          `;
+        }
+        return `
+          <label class="cf">
+            <span>${label}${f.required?' *':''}</span>
+            <input name="${name}" type="text" placeholder="${ph}" ${req} />
+          </label>
+        `;
+      }).join('');
+      return `<div class="pd-custom"><h4>Details</h4>${inputs}</div>`;
+    }
+
+    // --- initial HTML ---
     box.innerHTML = `
       <article class="product-details card-xl">
         <div class="pd-media">
           <div class="pd-gallery">
-            ${gallery.map((src,i)=>`
-              <img class="pd-img ${i===0?'active':''}" src="${src}" alt="${p.name || 'Product'} ${i+1}" />
-            `).join('')}
+            ${gallery.map((src,i)=>`<img class="pd-img ${i===0?'active':''}" src="${src}" alt="${p.name || 'Product'} ${i+1}" />`).join('')}
           </div>
           ${gallery.length>1 ? `
             <div class="pd-thumbs">
-              ${gallery.map((src,i)=>`
-                <img class="pd-thumb ${i===0?'active':''}" src="${src}" data-index="${i}" alt="thumb ${i+1}" />
-              `).join('')}
-            </div>
-          `:''}
+              ${gallery.map((src,i)=>`<img class="pd-thumb ${i===0?'active':''}" src="${src}" data-index="${i}" alt="thumb ${i+1}" />`).join('')}
+            </div>` : ''}
         </div>
 
         <div class="pd-body">
           <h2>${p.name || 'Product'}</h2>
 
           <div class="pd-meta">
-            <div class="pd-price">
-              ${salePrice>0 ? `<del>€ ${basePrice.toFixed(2)}</del>` : ''}
-              <strong>€ ${Number(price||0).toFixed(2)}</strong>
-            </div>
-            <div class="pd-stock ${inStock?'ok':'out'}">
-              ${inStock ? (p.track_stock ? `In stock • ${Number(p.quantity||0)} pcs` : 'Available') : 'Out of stock'}
-            </div>
+            <div class="pd-price" id="pdPrice"></div>
+            <div class="pd-stock" id="pdStock"></div>
             ${p.is_free_shipping ? `<div class="pd-badge free-ship">Free Shipping</div>` : ''}
-          </div>
-
-          <div class="pd-codes">
-            ${p.sku ? `<div><b>SKU:</b> ${p.sku}</div>` : ''}
-            ${p.taager_code ? `<div><b>Taager:</b> ${p.taager_code}</div>` : ''}
           </div>
 
           ${cats.length ? `<div class="pd-cats"><b>Categories:</b> ${cats.map(c=>c.name||c.slug||c.id).join(', ')}</div>` : ''}
 
-          ${renderVariations(p)}
+          <div id="pdVarsWrap">${renderVariations()}</div>
 
           ${p.description ? `<div class="pd-desc">${p.description}</div>` : ''}
 
+          <div id="pdCustomWrap">${renderCustomFields()}</div>
+
           <div class="pd-actions">
-            <a class="btn primary" target="_blank" rel="noopener" href="#/checkout/${p.slug || p.id}">
+            <a id="buyNowBtn" class="btn primary" target="_blank" rel="noopener" href="#">
               ${p.buy_now_text || 'Buy Now'}
             </a>
             <button id="pdBack" class="btn">Back</button>
@@ -286,7 +336,7 @@ async function loadProduct({ productId = null, slug = null } = {}) {
       </article>
     `;
 
-    // تبديل الصور عند الضغط على المصغّرات
+    // thumbs switch
     const thumbs = box.querySelectorAll('.pd-thumb');
     const imgs   = box.querySelectorAll('.pd-img');
     thumbs.forEach(t=>{
@@ -299,7 +349,76 @@ async function loadProduct({ productId = null, slug = null } = {}) {
       });
     });
 
-    // زر الرجوع
+    // update price/stock UI
+    function refreshMeta() {
+      selectedVariant = pickMatchingVariant();
+      const priceNode = box.querySelector('#pdPrice');
+      const stockNode = box.querySelector('#pdStock');
+
+      // base + sale (if no variant) OR variant price
+      if (!selectedVariant && salePrice > 0) {
+        priceNode.innerHTML = `<del>€ ${basePrice.toFixed(2)}</del> <strong>€ ${salePrice.toFixed(2)}</strong>`;
+      } else {
+        priceNode.innerHTML = `<strong>€ ${currentPrice().toFixed(2)}</strong>`;
+      }
+      stockNode.textContent = stockLabel();
+    }
+    refreshMeta();
+
+    // handle variation selection clicks
+    box.querySelectorAll('.var-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const vname = btn.dataset.vname;
+        const vval  = btn.dataset.vval;
+        // toggle UI
+        const group = btn.closest('.var-block')?.querySelectorAll('.var-btn') || [];
+        group.forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        // set selected
+        selected[vname] = vval;
+        refreshMeta();
+        refreshBuyLink();
+      });
+    });
+
+    // Build “Buy Now” link message
+    function buildOrderMessage() {
+      const lines = [];
+      lines.push(`Product: ${p.name || ''}`);
+      if (selectedVariant) {
+        const props = selectedVariant.variation_props || [];
+        lines.push('Variant: ' + props.map(pp=>`${pp.variation}: ${pp.variation_prop}`).join(' | '));
+      } else if (Object.keys(selected).length) {
+        lines.push('Options: ' + Object.entries(selected).map(([k,v])=>`${k}: ${v}`).join(' | '));
+      }
+      lines.push(`Price: € ${currentPrice().toFixed(2)}`);
+
+      // custom fields values
+      const cfWrap = box.querySelector('#pdCustomWrap');
+      if (cfWrap) {
+        const inputs = cfWrap.querySelectorAll('input,textarea');
+        inputs.forEach(i=>{
+          const label = i.closest('label')?.querySelector('span')?.textContent || i.name;
+          lines.push(`${label}: ${i.value || '-'}`);
+        });
+      }
+      return lines.join('\n');
+    }
+
+    function refreshBuyLink() {
+      const msg  = encodeURIComponent(buildOrderMessage());
+      const tel  = '962786041666'; // <- ضع رقمك/قناتك إن رغبت
+      const href = `https://wa.me/${tel}?text=${msg}`;
+      const a = box.querySelector('#buyNowBtn');
+      a.href = href;
+    }
+    refreshBuyLink();
+
+    // update link on custom-fields input
+    box.querySelectorAll('#pdCustomWrap input, #pdCustomWrap textarea').forEach(el=>{
+      el.addEventListener('input', refreshBuyLink);
+    });
+
     document.getElementById('pdBack')?.addEventListener('click', () => history.back());
   } catch (err) {
     console.error(err);
