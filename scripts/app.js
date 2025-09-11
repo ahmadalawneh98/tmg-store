@@ -97,14 +97,22 @@ function renderCategories(items = []) {
   });
 }
 
-/* show/hide sections */
-function showSection(idToShow) {
-  const ids = ['categories', 'products', 'productPage'];
-  ids.forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.style.display = (id === idToShow) ? '' : 'none';
-  });
+/* ========= Views (list=Categories+Products, product=ProductPage) ========= */
+function showView(mode) {
+  const cat = document.getElementById('categories');
+  const prod = document.getElementById('products');
+  const prodPage = document.getElementById('productPage');
+  if (!cat || !prod || !prodPage) return;
+
+  if (mode === 'product') {
+    cat.style.display = 'none';
+    prod.style.display = 'none';
+    prodPage.style.display = '';
+  } else { // 'list'
+    cat.style.display = '';
+    prod.style.display = '';
+    prodPage.style.display = 'none';
+  }
 }
 
 function renderProducts(items = []) {
@@ -160,7 +168,7 @@ async function navigateToProduct(productId, slug) {
 }
 
 async function loadProduct({ productId = null, slug = null } = {}) {
-  showSection('productPage');
+  showView('product');
   const box = document.getElementById('productDetails');
   box.innerHTML = '<div class="loading">Loading product…</div>';
 
@@ -351,7 +359,7 @@ window.addEventListener('popstate', async (e) => {
 
   const parentId = state.parentId ?? null;
   setBackVisibility(parentId);
-  showSection('categories');
+  showView('list');
   await loadCategories(parentId);
 });
 
@@ -368,11 +376,11 @@ function handleHashRoute() {
     return;
   }
 
-  // default: /categories
+  // default: /categories (+ products)
   if (hash.startsWith('#/categories') || hash === '' || hash === '#') {
     history.replaceState({ parentId: null }, '', '#/categories');
     setBackVisibility(null);
-    showSection('categories');
+    showView('list');
     loadCategories(null);
   }
 }
@@ -390,10 +398,10 @@ window.addEventListener('hashchange', handleHashRoute);
       return;
     }
 
-    // Default: categories
+    // Default: categories + products
     history.replaceState({ parentId: null }, '', '#/categories');
     setBackVisibility(null);
-    showSection('categories');
+    showView('list');
     await loadCategories(null);
   } catch (err) {
     console.error('Failed to load application:', err);
