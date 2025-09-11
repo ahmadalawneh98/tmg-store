@@ -168,16 +168,17 @@ async function navigateToProduct(productId, slug) {
 }
 
 // ======= REPLACE ONLY THIS FUNCTION IN /scripts/app.js =======
+// ======= REPLACE THIS WHOLE FUNCTION =======
 async function loadProduct({ productId = null, slug = null } = {}) {
   showView('product');
   const box = document.getElementById('productDetails');
   box.innerHTML = '<div class="loading">Loading product…</div>';
 
   try {
-    // helper: رجّع id من slug عبر طلب قائمة خفيفة
+    // resolve id by slug using a lightweight list call
     async function resolveIdBySlug(sl) {
       const url = new URL('/api/products', location.origin);
-      url.searchParams.set('fields', 'id,slug');        // خفيف
+      url.searchParams.set('fields', 'id,slug');
       url.searchParams.set('limit', '1');
       url.searchParams.append('filter', `slug||eq||${sl}`);
       const r = await fetch(url.toString());
@@ -187,41 +188,56 @@ async function loadProduct({ productId = null, slug = null } = {}) {
       return arr[0]?.id ?? arr[0]?._id ?? arr[0]?.uuid ?? null;
     }
 
+    if (!productId && slug) productId = await resolveIdBySlug(slug);
+
     let p;
-    if (!productId && slug) {
-      productId = await resolveIdBySlug(slug);
-    }
     if (productId) {
-      // get-one بدون join (الـ API يعيد variations/variants ضمن الاستجابة الافتراضية)
+      // EasyOrders Get One Product (returns variations + variants)
       const r = await fetch(`/api/products?id=${encodeURIComponent(productId)}`);
       if (!r.ok) throw new Error(await r.text());
       p = await r.json();
     }
-
     if (!p) { box.innerHTML = '<div class="error">Product not found</div>'; return; }
 
-    // --- تطبيع البيانات ---
-    const basePrice   = Number(p.price || 0);
-    const salePrice   = Number(p.sale_price || 0);
-    const gallery     = Array.isArray(p.images) && p.images.length ? p.images : (p.thumb ? [p.thumb] : []);
-    const cats        = Array.isArray(p.categories) ? p.categories : [];
-    const variations  = Array.isArray(p.variations) ? p.variations : [];
-    const variants    = Array.isArray(p.variants)   ? p.variants   : [];
+    // ---------- normalize ----------
+    const basePrice  = Number(p.price || 0);
+    const salePrice  = Number(p.sale_price || 0);
+    const gallery    = Array.isArray(p.images) && p.images.length ? p.images : (p.thumb ? [p.thumb] : []);
+    const cats       = Array.isArray(p.categories) ? p.categories : [];
+    const variations = Array.isArray(p.variations) ? p.variations : [];
+    const variants   = Array.isArray(p.variants)   ? p.variants   : [];
+    const currency   = (p.currency || 'EUR').toUpperCase();
 
-    // حالة الاختيار + مطابقة الفاريانت
-    const selected = {};
+    // ---------- selection state ----------
+    const selected = {}; // { variationName: propValue OR free-text }
     let selectedVariant = null;
+
+    // which variations are "structured" (affect variant match)
+    const structuredTypes = new Set(['dropdown', 'buttons', 'button', 'color', 'swatch', 'radio']);
+    const isStructured = (v) => structuredTypes.has(String(v?.type || '').toLowerCase());
 
     function matchVariant() {
       if (!variations.length || !variants.length) return null;
-      for (const v of variations) if (!selected[v.name]) return null;
+
+      const requiredNames = variations
+        .filter(isStructured)
+        .map(v => String(v.name));
+
+      // must have selected value for each structured variation
+      if (requiredNames.some(n => selected[n] == null)) return null;
+
       return variants.find(v => {
         const props = Array.isArray(v.variation_props) ? v.variation_props : [];
-        return Object.entries(selected).every(([name,val]) =>
-          props.some(pp => String(pp.variation) === String(name) && String(pp.variation_prop) === String(val))
-        );
+        return requiredNames.every(name => {
+          const val = String(selected[name]);
+          return props.some(pp =>
+            String(pp.variation) === String(name) &&
+            String(pp.variation_prop) === val
+          );
+        });
       }) || null;
     }
+
     function currentPrice() {
       if (selectedVariant) {
         const sp = Number(selectedVariant.sale_price || 0);
@@ -229,107 +245,126 @@ async function loadProduct({ productId = null, slug = null } = {}) {
       }
       return salePrice > 0 ? salePrice : basePrice;
     }
+
     function stockLabel() {
       if (selectedVariant) {
         const q = Number(selectedVariant.quantity || 0);
-        return q > 0 ? `In stock • ${q}` : 'Out of stock';
+        return q > 0 ? 'Available' : 'Out of stock';
       }
       if (p.track_stock) {
         const q = Number(p.quantity || 0);
-        return q > 0 ? `In stock • ${q}` : 'Out of stock';
+        return q > 0 ? 'Available' : 'Out of stock';
       }
       return 'Available';
     }
 
-    // ——— UI للـ variations (نسخة مرنة) ———
-  function renderVariations() {
-  if (!variations.length) return '';
+    // --------- render variations strictly by API types ---------
+    const textTypes = new Set(['text', 'input', 'textarea', 'email', 'password', 'number']);
+    const isTextLike = (v) => textTypes.has(String(v?.type || '').toLowerCase());
 
-  const blocks = variations.map(v => {
-    const vName = String(v.name || '').trim();
-    const type  = String(v.type || 'buttons').toLowerCase();
+    function renderVariations() {
+      if (!variations.length) return '';
 
-    // Normalize props (if any)
-    const rawProps =
-      Array.isArray(v.props)   ? v.props :
-      Array.isArray(v.values)  ? v.values :
-      Array.isArray(v.options) ? v.options : [];
-    const props = rawProps.map(pr => ({
-      name:  pr.name ?? pr.label ?? pr.value ?? '',
-      value: pr.value ?? pr.name  ?? pr.label ?? ''
-    })).filter(p => p.value !== '');
+      const blocks = variations.map(v => {
+        const vName = String(v.name || '').trim();
+        const type  = String(v.type || '').toLowerCase();
 
-    // Detect text-like fields (IGN, Email, Pass, Recovery Codes, etc.)
-    const n = vName.toLowerCase();
-    const looksText =
-      type === 'text' || type === 'input' ||
-      n.includes('ign') || n.includes('name') || n.includes('login') ||
-      n.includes('user') || n.includes('email') || n.includes('mail') ||
-      n.includes('pass') || n.includes('password') ||
-      n.includes('recovery') || n.includes('code');
+        const rawProps =
+          Array.isArray(v.props)   ? v.props :
+          Array.isArray(v.values)  ? v.values :
+          Array.isArray(v.options) ? v.options : [];
 
-    // For text-like fields, render <input>/<textarea> even if no props
-    if (looksText) {
-      // choose the appropriate control
-      let controlHtml = '';
-      if (n.includes('email')) {
-        controlHtml = `<input class="var-input" type="email" data-vname="${vName}" placeholder="enter ${vName}">`;
-      } else if (n.includes('pass')) {
-        controlHtml = `<input class="var-input" type="password" data-vname="${vName}" placeholder="enter ${vName}">`;
-      } else if (n.includes('code')) {
-        controlHtml = `<textarea class="var-input" rows="3" data-vname="${vName}" placeholder="enter ${vName}"></textarea>`;
-      } else {
-        controlHtml = `<input class="var-input" type="text" data-vname="${vName}" placeholder="enter ${vName}">`;
-      }
+        const props = rawProps.map(pr => ({
+          name:  pr.name ?? pr.label ?? pr.value ?? '',
+          value: pr.value ?? pr.name  ?? pr.label ?? ''
+        })).filter(p => String(p.value) !== '');
 
-      return `
-        <label class="var-block input">
-          <div class="var-title">${vName}</div>
-          ${controlHtml}
-        </label>
-      `;
+        // 1) text-like inputs from API types
+        if (isTextLike(v)) {
+          let inputType = 'text';
+          if (type === 'email') inputType = 'email';
+          else if (type === 'password') inputType = 'password';
+          else if (type === 'number') inputType = 'number';
+
+          const control = (type === 'textarea')
+            ? `<textarea class="var-input" rows="3" data-vname="${vName}" placeholder="${vName}"></textarea>`
+            : `<input class="var-input" type="${inputType}" data-vname="${vName}" placeholder="${vName}">`;
+
+          return `
+            <label class="var-block input">
+              <div class="var-title">${vName}</div>
+              ${control}
+            </label>
+          `;
+        }
+
+        // 2) dropdown
+        if (type === 'dropdown' && props.length) {
+          const opts = ['<option value="">— Select —</option>']
+            .concat(props.map(pr => `<option value="${pr.value}">${pr.name}</option>`))
+            .join('');
+          return `
+            <label class="var-block dropdown">
+              <div class="var-title">${vName}</div>
+              <select class="var-select" data-vname="${vName}">
+                ${opts}
+              </select>
+            </label>
+          `;
+        }
+
+        // 3) color swatches
+        if (type === 'color' && props.length) {
+          const btns = props.map(pr => `
+            <button type="button" class="var-btn var-color"
+                    data-vname="${vName}" data-vval="${pr.value}" title="${pr.name}">
+              <span class="swatch" style="background:${pr.value};"></span>
+              <span class="swatch-label">${pr.name}</span>
+            </button>
+          `).join('');
+          return `
+            <div class="var-block colors">
+              <div class="var-title">${vName}</div>
+              <div class="var-options">${btns}</div>
+            </div>
+          `;
+        }
+
+        // 4) buttons (default)
+        if (props.length) {
+          const defaultVal = v.default ?? (v.auto_select_first ? String(props[0].value) : null);
+
+          const btns = props.map(pr => `
+            <button type="button" class="var-btn${defaultVal && String(defaultVal)===String(pr.value) ? ' active':''}"
+                    data-vname="${vName}" data-vval="${pr.value}">
+              ${pr.name}
+            </button>
+          `).join('');
+
+          if (defaultVal != null && selected[vName] == null) selected[vName] = String(defaultVal);
+
+          return `
+            <div class="var-block buttons">
+              <div class="var-title">${vName}</div>
+              <div class="var-options">${btns}</div>
+            </div>
+          `;
+        }
+
+        // 5) fallback: simple input
+        return `
+          <label class="var-block input">
+            <div class="var-title">${vName || 'Option'}</div>
+            <input class="var-input" type="text" data-vname="${vName || 'Option'}" placeholder="${vName || 'Option'}">
+          </label>
+        `;
+      }).join('');
+
+      // No "Options" heading to mimic original page
+      return blocks.trim() ? `<div class="pd-variations">${blocks}</div>` : '';
     }
 
-    // Dropdown selector
-    if (type === 'dropdown' && props.length) {
-      const opts = ['<option value="">— Select —</option>']
-        .concat(props.map(pr => `<option value="${pr.value}">${pr.name}</option>`))
-        .join('');
-      return `
-        <label class="var-block dropdown">
-          <div class="var-title">${vName}</div>
-          <select class="var-select" data-vname="${vName}">
-            ${opts}
-          </select>
-        </label>
-      `;
-    }
-
-    // Buttons (default/radio-like)
-    if (props.length) {
-      const btns = props.map(pr => `
-        <button type="button" class="var-btn" data-vname="${vName}" data-vval="${pr.value}">
-          ${pr.name}
-        </button>
-      `).join('');
-      return `
-        <div class="var-block buttons">
-          <div class="var-title">${vName}</div>
-          <div class="var-options">${btns}</div>
-        </div>
-      `;
-    }
-
-    // Nothing to render
-    return '';
-  }).join('');
-
-  return blocks.trim()
-    ? `<div class="pd-variations"><h4>Options</h4>${blocks}</div>`
-    : '';
-}
-
-    // ——— صفحة المنتج ———
+    // ---------- page markup ----------
     box.innerHTML = `
       <article class="product-details card-xl">
         <div class="pd-media">
@@ -344,6 +379,7 @@ async function loadProduct({ productId = null, slug = null } = {}) {
 
         <div class="pd-body">
           <h2>${p.name || 'Product'}</h2>
+
           <div class="pd-meta">
             <div class="pd-price" id="pdPrice"></div>
             <div class="pd-stock" id="pdStock"></div>
@@ -354,17 +390,17 @@ async function loadProduct({ productId = null, slug = null } = {}) {
 
           <div id="pdVarsWrap">${renderVariations()}</div>
 
-          ${p.description ? `<div class="pd-desc">${p.description}</div>` : ''}
-
           <div class="pd-actions">
-            <button id="proceedBtn" class="btn primary">Proceed to Checkout</button>
-            <button id="pdBack" class="btn">Back</button>
+            <button id="buyNowBtn" class="btn primary">Click here to buy</button>
+            <button id="addToCartBtn" class="btn">Add to cart</button>
           </div>
+
+          ${p.description ? `<div class="pd-desc">${p.description}</div>` : ''}
         </div>
       </article>
     `;
 
-    // thumbs
+    // ---------- gallery thumbs ----------
     const thumbs = box.querySelectorAll('.pd-thumb');
     const imgs   = box.querySelectorAll('.pd-img');
     thumbs.forEach(t=>{
@@ -377,25 +413,25 @@ async function loadProduct({ productId = null, slug = null } = {}) {
       });
     });
 
-    // تحديث السعر/المخزون
+    // ---------- price / stock ----------
     function refreshMeta() {
       selectedVariant = matchVariant();
       const priceNode = box.querySelector('#pdPrice');
       const stockNode = box.querySelector('#pdStock');
 
       if (!selectedVariant && salePrice > 0) {
-        priceNode.innerHTML = `<del>€ ${basePrice.toFixed(2)}</del> <strong>€ ${salePrice.toFixed(2)}</strong>`;
+        priceNode.innerHTML = `<del>${basePrice.toFixed(2)} ${currency}</del> <strong>${salePrice.toFixed(2)} ${currency}</strong>`;
       } else {
-        priceNode.innerHTML = `<strong>€ ${currentPrice().toFixed(2)}</strong>`;
+        priceNode.innerHTML = `<strong>${currentPrice().toFixed(2)} ${currency}</strong>`;
       }
       stockNode.textContent = stockLabel();
 
-      const proceed = box.querySelector('#proceedBtn');
-      proceed.disabled = stockNode.textContent.toLowerCase().includes('out of stock');
+      const buy = box.querySelector('#buyNowBtn');
+      buy.disabled = stockNode.textContent.toLowerCase().includes('out of stock');
     }
     refreshMeta();
 
-    // events للـ variations
+    // ---------- variation events ----------
     box.querySelectorAll('.var-select').forEach(sel=>{
       sel.addEventListener('change', ()=>{
         const name = sel.dataset.vname;
@@ -414,38 +450,62 @@ async function loadProduct({ productId = null, slug = null } = {}) {
         refreshMeta();
       });
     });
-
-    // متابعة الدفع (مسودة فقط الآن)
-    box.querySelector('#proceedBtn')?.addEventListener('click', ()=>{
-      if (variations.length) {
-        const missing = variations.filter(v => !selected[v.name]).map(v=>v.name);
-        if (missing.length) { alert(`Please select: ${missing.join(', ')}`); return; }
-      }
-      const draft = {
-        product: {
-          id: p.id || p._id || p.uuid || null,
-          slug: p.slug || null,
-          name: p.name || '',
-          thumb: p.thumb || (Array.isArray(p.images) ? p.images[0] : '')
-        },
-        selections: { ...selected },
-        variant: selectedVariant ? {
-          id: selectedVariant.id || null,
-          taager_code: selectedVariant.taager_code || null,
-          price: Number(selectedVariant.price || 0),
-          sale_price: Number(selectedVariant.sale_price || 0),
-          quantity: Number(selectedVariant.quantity || 0),
-          props: selectedVariant.variation_props || []
-        } : null,
-        price: currentPrice(),
-        quantity: 1
+    box.querySelectorAll('.var-input').forEach(inp=>{
+      const apply = () => {
+        const name = inp.dataset.vname;
+        const val  = inp.value?.trim();
+        if (val) selected[name] = val; else delete selected[name];
       };
-      try { sessionStorage.setItem('checkoutDraft', JSON.stringify(draft)); } catch {}
-      history.pushState({ view: 'checkout', draft }, '', `#/checkout/${p.slug || (p.id || '')}`);
-      alert('Draft saved. Implement real checkout API next.');
+      inp.addEventListener('input', apply);
+      inp.addEventListener('change', apply);
+      inp.addEventListener('blur', apply);
     });
 
-    document.getElementById('pdBack')?.addEventListener('click', () => history.back());
+    // ---------- actions ----------
+    const buildDraft = () => ({
+      product: {
+        id: p.id || p._id || p.uuid || null,
+        slug: p.slug || null,
+        name: p.name || '',
+        thumb: p.thumb || (Array.isArray(p.images) ? p.images[0] : '')
+      },
+      selections: { ...selected },
+      variant: selectedVariant ? {
+        id: selectedVariant.id || null,
+        taager_code: selectedVariant.taager_code || null,
+        price: Number(selectedVariant.price || 0),
+        sale_price: Number(selectedVariant.sale_price || 0),
+        quantity: Number(selectedVariant.quantity || 0),
+        props: selectedVariant.variation_props || []
+      } : null,
+      price: currentPrice(),
+      currency,
+      quantity: 1
+    });
+
+    // Buy Now
+    box.querySelector('#buyNowBtn')?.addEventListener('click', ()=>{
+      // require only structured selections
+      const missing = variations
+        .filter(isStructured)
+        .filter(v => !selected[v.name])
+        .map(v => v.name);
+      if (missing.length) { alert(`Please select: ${missing.join(', ')}`); return; }
+
+      const draft = buildDraft();
+      try { sessionStorage.setItem('checkoutDraft', JSON.stringify(draft)); } catch {}
+      history.pushState({ view: 'checkout', draft }, '', `#/checkout/${p.slug || (p.id || '')}`);
+    });
+
+    // Add to cart
+    box.querySelector('#addToCartBtn')?.addEventListener('click', ()=>{
+      const draft = buildDraft();
+      const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+      cart.push(draft);
+      localStorage.setItem('cart', JSON.stringify(cart));
+      alert('Added to cart');
+    });
+
   } catch (err) {
     console.error(err);
     box.innerHTML = '<div class="error">Error loading product</div>';
