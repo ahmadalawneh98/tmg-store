@@ -167,8 +167,6 @@ async function navigateToProduct(productId, slug) {
   await loadProduct({ productId, slug });
 }
 
-// ======= REPLACE ONLY THIS FUNCTION IN /scripts/app.js =======
-// ======= REPLACE THIS WHOLE FUNCTION =======
 // ======= REPLACE THIS WHOLE FUNCTION =======
 async function loadProduct({ productId = null, slug = null } = {}) {
   showView('product');
@@ -224,7 +222,6 @@ async function loadProduct({ productId = null, slug = null } = {}) {
         .filter(isStructured)
         .map(v => String(v.name));
 
-      // must have selected value for each structured variation
       if (requiredNames.some(n => selected[n] == null)) return null;
 
       return variants.find(v => {
@@ -259,10 +256,27 @@ async function loadProduct({ productId = null, slug = null } = {}) {
       return 'Available';
     }
 
-    // --------- render variations strictly by API types ---------
-    const textTypes = new Set(['text', 'input', 'textarea', 'email', 'password', 'number']);
-    const isTextLike = (v) => textTypes.has(String(v?.type || '').toLowerCase());
+    // --------- helpers to fix "user will enter" props ---------
+    function isTextLikeByType(v) {
+      const t = String(v?.type || '').toLowerCase();
+      return ['text','input','textarea','email','password','number'].includes(t);
+    }
+    function propsArePlaceholders(props) {
+      if (!Array.isArray(props) || props.length === 0) return false;
+      return props.every(pr => {
+        const val = String(pr?.value ?? pr?.name ?? '').trim().toLowerCase();
+        return (
+          val === 'user will enter' ||
+          val === 'user will write' ||
+          val === 'enter value' ||
+          val === 'will enter' ||
+          val === 'سيقوم المستخدم بالإدخال' ||
+          val === 'اكتب هنا'
+        );
+      });
+    }
 
+    // --------- render variations strictly by API types ---------
     function renderVariations() {
       if (!variations.length) return '';
 
@@ -278,18 +292,23 @@ async function loadProduct({ productId = null, slug = null } = {}) {
         const props = rawProps.map(pr => ({
           name:  pr.name ?? pr.label ?? pr.value ?? '',
           value: pr.value ?? pr.name  ?? pr.label ?? ''
-        })).filter(p => String(p.value) !== '');
+        })).filter(p => (p.value ?? '') !== '');
 
-        // 1) text-like inputs from API types
-        if (isTextLike(v)) {
+        const treatAsText = isTextLikeByType(v) || propsArePlaceholders(props);
+
+        // 1) text-like (or placeholder props) -> real input/textarea
+        if (treatAsText) {
+          const ph = props.find(p => (p.name || p.value));
+          const placeholder = (ph?.name || ph?.value || vName || 'Enter value');
+
           let inputType = 'text';
           if (type === 'email') inputType = 'email';
           else if (type === 'password') inputType = 'password';
           else if (type === 'number') inputType = 'number';
 
           const control = (type === 'textarea')
-            ? `<textarea class="var-input" rows="3" data-vname="${vName}" placeholder="${vName}"></textarea>`
-            : `<input class="var-input" type="${inputType}" data-vname="${vName}" placeholder="${vName}">`;
+            ? `<textarea class="var-input" rows="3" data-vname="${vName}" placeholder="${placeholder}"></textarea>`
+            : `<input class="var-input" type="${inputType}" data-vname="${vName}" placeholder="${placeholder}">`;
 
           return `
             <label class="var-block input">
@@ -486,7 +505,6 @@ async function loadProduct({ productId = null, slug = null } = {}) {
 
     // Buy Now
     box.querySelector('#buyNowBtn')?.addEventListener('click', ()=>{
-      // require only structured selections
       const missing = variations
         .filter(isStructured)
         .filter(v => !selected[v.name])
@@ -512,6 +530,7 @@ async function loadProduct({ productId = null, slug = null } = {}) {
     box.innerHTML = '<div class="error">Error loading product</div>';
   }
 }
+
 
 /* ========= Products helpers ========= */
 function pickPrice(p){
