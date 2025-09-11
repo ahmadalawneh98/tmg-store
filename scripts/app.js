@@ -154,7 +154,6 @@ function renderProducts(items = []) {
 
   attachTilt(grid);
 }
-
 async function loadProduct({ productId = null, slug = null } = {}) {
   showSection('productPage');
   const box = document.getElementById('productDetails');
@@ -208,64 +207,6 @@ async function loadProduct({ productId = null, slug = null } = {}) {
   }
 }
 
-
-async function loadProduct({ productId = null, slug = null } = {}) {
-  showSection('productPage');
-
-  const box = document.getElementById('productDetails');
-  box.innerHTML = '<div class="loading">Loading product…</div>';
-
-  try {
-    // نحاول أولاً عبر الـ slug إن وجد
-    const url = new URL('/api/products', location.origin);
-    if (slug) {
-      url.searchParams.append('filter', `slug||eq||${slug}`);
-    } else if (productId) {
-      url.searchParams.append('filter', `id||eq||${productId}`);
-    }
-    url.searchParams.set('limit', '1');
-    url.searchParams.set('join', 'categories');
-
-    const r = await fetch(url.toString());
-    if (!r.ok) throw new Error(await r.text());
-    const j = await r.json();
-    const arr = Array.isArray(j) ? j : (j?.data ?? []);
-    const p = arr[0];
-
-    if (!p) {
-      box.innerHTML = '<div class="error">Product not found</div>';
-      return;
-    }
-
-    const price = Number(p.sale_price || 0) > 0 ? p.sale_price : p.price;
-    const img = p.thumb || (Array.isArray(p.images) ? p.images[0] : '') || '';
-    const cats = Array.isArray(p.categories) ? p.categories : [];
-
-    box.innerHTML = `
-      <article class="product-details">
-        <div class="pd-media">
-          <img src="${img}" alt="${p.name || 'Product'}" />
-        </div>
-        <div class="pd-body">
-          <h2>${p.name || 'Product'}</h2>
-          <div class="pd-price">€ ${Number(price || 0).toFixed(2)}</div>
-          ${p.description ? `<div class="pd-desc">${p.description}</div>` : ''}
-          ${cats.length ? `<div class="pd-cats">Categories: ${cats.map(c=>c.name).join(', ')}</div>` : ''}
-          <div class="pd-actions">
-            <a class="btn primary" target="_blank" rel="noopener" href="#/checkout/${p.slug || p.id}">Buy Now</a>
-            <button id="pdBack" class="btn">Back</button>
-          </div>
-        </div>
-      </article>
-    `;
-
-    // زر الرجوع داخل صفحة المنتج
-    document.getElementById('pdBack')?.addEventListener('click', () => history.back());
-  } catch (err) {
-    console.error(err);
-    box.innerHTML = '<div class="error">Error loading product</div>';
-  }
-}
 
 
 /* ========= Products helpers ========= */
