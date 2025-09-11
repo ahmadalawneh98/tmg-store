@@ -435,6 +435,7 @@ async function loadProduct({ productId = null, slug = null } = {}) {
             <button id="addToCartBtn" class="btn">Add to cart</button>
           </div>
 
+
           ${p.description ? `<div class="pd-desc">${p.description}</div>` : ''}
         </div>
       </article>
@@ -557,13 +558,12 @@ async function loadProduct({ productId = null, slug = null } = {}) {
     });
 
     // Add to cart
-    box.querySelector('#addToCartBtn')?.addEventListener('click', ()=>{
-      const draft = buildDraft();
-      const cart = JSON.parse(localStorage.getItem('cart') || '[]');
-      cart.push(draft);
-      localStorage.setItem('cart', JSON.stringify(cart));
-      alert('Added to cart');
-    });
+   // Add to cart (uses global cart helpers)
+box.querySelector('#addToCartBtn')?.addEventListener('click', ()=>{
+  const draft = buildDraft();
+  addToCart(draft, { open: true }); // يفتح درج السلة بعد الإضافة
+});
+
 
   } catch (err) {
     console.error(err);
@@ -783,3 +783,162 @@ document.querySelectorAll('.navlinks a[href^="#"]').forEach(a=>{
     }
   });
 });
+
+
+
+/* ========= Cart logic ========= */
+const CART_KEY = 'cart';
+
+function getCart() {
+  try { return JSON.parse(localStorage.getItem(CART_KEY) || '[]'); }
+  catch { return []; }
+}
+function setCart(items) {
+  localStorage.setItem(CART_KEY, JSON.stringify(items || []));
+  window.dispatchEvent(new CustomEvent('cart:updated'));
+}
+function cartCount() {
+  return getCart().reduce((s, it) => s + Number(it.quantity || 1), 0);
+}
+function cartTotal() {
+  const items = getCart();
+  const sum = items.reduce((s, it) => s + (Number(it.price || 0) * Number(it.quantity || 1)), 0);
+  // نفترض العملة من أول عنصر (أو USD)
+  const currency = items[0]?.currency || 'USD';
+  return { sum, currency };
+}
+function sameCartLine(a, b) {
+  // دمج العناصر المتطابقة: نفس المنتج + نفس الـ variant (لو موجود) + نفس selections
+  const aKey = JSON.stringify({ pid:a.product?.id, vid:a.variant?.id || null, sel:a.selections || {} });
+  const bKey = JSON.stringify({ pid:b.product?.id, vid:b.variant?.id || null, sel:b.selections || {} });
+  return aKey === bKey;
+}
+function addToCart(line, { open = true } = {}) {
+  const items = getCart();
+  const idx = items.findIndex(it => sameCartLine(it, line));
+  if (idx >= 0) {
+    items[idx].quantity = Number(items[idx].quantity || 1) + Number(line.quantity || 1);
+  } else {
+    items.push({ ...line, quantity: Number(line.quantity || 1) || 1 });
+  }
+  setCart(items);
+  if (open) openCartDrawer();
+}
+function removeFromCart(index) {
+  const items = getCart();
+  items.splice(index, 1);
+  setCart(items);
+}
+function updateCartQty(index, qty) {
+  qty = Math.max(1, Number(qty) || 1);
+  const items = getCart();
+  if (!items[index]) return;
+  items[index].quantity = qty;
+  setCart(items);
+}
+
+/* ==== UI bindings ==== */
+const cartBtn     = document.getElementById('cartBtn');
+const cartDrawer  = document.getElementById('cartDrawer');
+const cartItemsEl = document.getElementById('cartItems');
+const cartTotalEl = document.getElementById('cartTotal');
+const cartCurrEl  = document.getElementById('cartCurrency');
+const cartCountEl = document.getElementById('cartCount');
+
+function renderCartCount() {
+  if (!cartCountEl) return;
+  cartCountEl.textContent = String(cartCount());
+}
+function renderCartDrawer() {
+  if (!cartItemsEl) return;
+  const items = getCart();
+
+  if (items.length === 0) {
+    cartItemsEl.innerHTML = `<div class="empty">Your cart is empty.</div>`;
+  } else {
+    cartItemsEl.innerHTML = items.map((it, i) => {
+      const name = it?.product?.name || 'Product';
+      const thumb= it?.product?.thumb || '';
+      const qty  = Number(it.quantity || 1);
+      const price= Number(it.price || 0);
+      const line = (qty * price).toFixed(2);
+
+      // عرض الاختيارات
+      const opts = it.selections
+        ? Object.entries(it.selections).map(([k,v]) => `<span><b>${k}:</b> ${v}</span>`).join(' • ')
+        : '';
+
+      return `
+        <div class="cart-item" data-idx="${i}">
+          <img src="${thumb}" alt="${name}">
+          <div>
+            <div class="ci-title">${name}</div>
+            <div class="ci-opts">${opts}</div>
+            <div class="cart-qty" role="group" aria-label="Quantity">
+              <button data-act="dec" aria-label="Decrease">−</button>
+              <input type="number" min="1" value="${qty}" data-act="qty">
+              <button data-act="inc" aria-label="Increase">+</button>
+            </div>
+            <button class="cart-remove" data-act="remove">Remove</button>
+          </div>
+          <div class="ci-price">${line}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  const { sum, currency } = cartTotal();
+  cartTotalEl.textContent = sum.toFixed(2);
+  cartCurrEl.textContent  = currency;
+
+  // Delegation for qty / remove
+  cartItemsEl.onclick = (e) => {
+    const item = e.target.closest('.cart-item');
+    if (!item) return;
+    const idx = Number(item.dataset.idx || -1);
+    const act = e.target.getAttribute('data-act');
+    if (act === 'remove') { removeFromCart(idx); return; }
+    if (act === 'dec')    { updateCartQty(idx, Number(item.querySelector('[data-act="qty"]').value) - 1); return; }
+    if (act === 'inc')    { updateCartQty(idx, Number(item.querySelector('[data-act="qty"]').value) + 1); return; }
+  };
+  cartItemsEl.onchange = (e) => {
+    const input = e.target.closest('input[data-act="qty"]');
+    if (!input) return;
+    const item = e.target.closest('.cart-item'); if (!item) return;
+    updateCartQty(Number(item.dataset.idx || -1), Number(input.value || 1));
+  };
+}
+
+function openCartDrawer() {
+  if (!cartDrawer) return;
+  cartDrawer.classList.add('open');
+  cartDrawer.setAttribute('aria-hidden', 'false');
+  renderCartDrawer();
+}
+function closeCartDrawer() {
+  if (!cartDrawer) return;
+  cartDrawer.classList.remove('open');
+  cartDrawer.setAttribute('aria-hidden', 'true');
+}
+
+/* Bind open/close */
+cartBtn?.addEventListener('click', openCartDrawer);
+cartDrawer?.addEventListener('click', (e) => {
+  if (e.target.matches('[data-close="drawer"]') || e.target.classList.contains('cart-overlay')) {
+    closeCartDrawer();
+  }
+});
+document.getElementById('clearCart')?.addEventListener('click', () => setCart([]));
+document.getElementById('goCheckout')?.addEventListener('click', () => {
+  // لو عندك صفحة Checkout SPA: وجهه لها. وإلا خليه يفتح الدرج فقط.
+  // history.pushState({ view: 'checkout' }, '', '#/checkout'); // إذا عندك صفحة Checkout
+  closeCartDrawer();
+  alert('Proceed to checkout (wire this to your real checkout flow)');
+});
+
+/* React to updates (and cross-tab updates) */
+window.addEventListener('cart:updated', () => { renderCartCount(); renderCartDrawer(); });
+window.addEventListener('storage', (e) => { if (e.key === CART_KEY) { renderCartCount(); renderCartDrawer(); } });
+
+/* First render */
+renderCartCount();
