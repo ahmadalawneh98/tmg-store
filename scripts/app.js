@@ -168,6 +168,7 @@ async function navigateToProduct(productId, slug) {
 }
 
 // ======= REPLACE THIS WHOLE FUNCTION =======
+// ======= REPLACE THIS WHOLE FUNCTION =======
 async function loadProduct({ productId = null, slug = null } = {}) {
   showView('product');
   const box = document.getElementById('productDetails');
@@ -198,6 +199,14 @@ async function loadProduct({ productId = null, slug = null } = {}) {
     }
     if (!p) { box.innerHTML = '<div class="error">Product not found</div>'; return; }
 
+    // ---------- helpers: normalization (CRITICAL) ----------
+    const norm = (s) => String(s ?? '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const normMap = (obj) =>
+      Object.fromEntries(Object.entries(obj).map(([k,v]) => [norm(k), norm(v)]));
+
     // ---------- normalize ----------
     const basePrice  = Number(p.price || 0);
     const salePrice  = Number(p.sale_price || 0);
@@ -205,35 +214,54 @@ async function loadProduct({ productId = null, slug = null } = {}) {
     const cats       = Array.isArray(p.categories) ? p.categories : [];
     const variations = Array.isArray(p.variations) ? p.variations : [];
     const variants   = Array.isArray(p.variants)   ? p.variants   : [];
-    const currency   = (p.currency || 'EUR').toUpperCase();
+    const currency   = (p.custom_currency || p.currency || 'USD').toUpperCase();
 
     // ---------- selection state ----------
-    const selected = {}; // { variationName: propValue OR free-text }
-    let selectedVariant = null;
+    // selectedDisplay: يحتفظ بالنص الأصلي للعرض
+    // selected: نسخة مُطبّعة للمطابقة
+    const selectedDisplay = {};   // { rawName: rawValue }
+    const selected        = {};   // { normName: normValue }
+    let selectedVariant   = null;
 
-    // which variations are "structured" (affect variant match)
+    // structured types only affect variant match
     const structuredTypes = new Set(['dropdown', 'buttons', 'button', 'color', 'swatch', 'radio']);
     const isStructured = (v) => structuredTypes.has(String(v?.type || '').toLowerCase());
+
+    // text-like detection
+    const isTextLikeByType = (v) => {
+      const t = String(v?.type || '').toLowerCase();
+      return ['text','input','textarea','email','password','number','user_text'].includes(t);
+    };
+    const propsArePlaceholders = (props) => {
+      if (!Array.isArray(props) || props.length === 0) return false;
+      return props.every(pr => ['user will enter','user will write','enter value','will enter','سيقوم المستخدم بالإدخال','اكتب هنا']
+        .includes(norm(pr?.value ?? pr?.name ?? '')));
+    };
 
     function matchVariant() {
       if (!variations.length || !variants.length) return null;
 
-      const requiredNames = variations
+      // أسماء المتغيّرات المطلوبة (مطبّعة)
+      const requiredKeys = variations
         .filter(isStructured)
-        .map(v => String(v.name));
+        .map(v => norm(v.name));
 
-      if (requiredNames.some(n => selected[n] == null)) return null;
+      // لازم نكون مختارين لكل structured
+      if (requiredKeys.some(k => !selected[k])) return null;
 
-      return variants.find(v => {
-        const props = Array.isArray(v.variation_props) ? v.variation_props : [];
-        return requiredNames.every(name => {
-          const val = String(selected[name]);
+      // ابحث عن أول variant يطابق كل القيم المطلوبة بعد التطبيع
+      for (const varItem of variants) {
+        const props = Array.isArray(varItem.variation_props) ? varItem.variation_props : [];
+        const ok = requiredKeys.every(k => {
+          const selVal = selected[k];
           return props.some(pp =>
-            String(pp.variation) === String(name) &&
-            String(pp.variation_prop) === val
+            norm(pp.variation) === k &&
+            norm(pp.variation_prop) === selVal
           );
         });
-      }) || null;
+        if (ok) return varItem;
+      }
+      return null;
     }
 
     function currentPrice() {
@@ -256,63 +284,46 @@ async function loadProduct({ productId = null, slug = null } = {}) {
       return 'Available';
     }
 
-    // --------- helpers to fix "user will enter" props ---------
-    function isTextLikeByType(v) {
-      const t = String(v?.type || '').toLowerCase();
-      return ['text','input','textarea','email','password','number'].includes(t);
-    }
-    function propsArePlaceholders(props) {
-      if (!Array.isArray(props) || props.length === 0) return false;
-      return props.every(pr => {
-        const val = String(pr?.value ?? pr?.name ?? '').trim().toLowerCase();
-        return (
-          val === 'user will enter' ||
-          val === 'user will write' ||
-          val === 'enter value' ||
-          val === 'will enter' ||
-          val === 'سيقوم المستخدم بالإدخال' ||
-          val === 'اكتب هنا'
-        );
-      });
-    }
-
-    // --------- render variations strictly by API types ---------
+    // --------- render variations (respect API types) ---------
     function renderVariations() {
       if (!variations.length) return '';
 
       const blocks = variations.map(v => {
-        const vName = String(v.name || '').trim();
-        const type  = String(v.type || '').toLowerCase();
+        const vRawName = String(v.name || '');
+        const vKey     = norm(vRawName);                 // مفتاح موحّد
+        const type     = String(v.type || '').toLowerCase();
 
         const rawProps =
           Array.isArray(v.props)   ? v.props :
           Array.isArray(v.values)  ? v.values :
           Array.isArray(v.options) ? v.options : [];
 
-        const props = rawProps.map(pr => ({
-          name:  pr.name ?? pr.label ?? pr.value ?? '',
-          value: pr.value ?? pr.name  ?? pr.label ?? ''
-        })).filter(p => (p.value ?? '') !== '');
+        const props = rawProps.map(pr => {
+          const name  = pr.name ?? pr.label ?? pr.value ?? '';
+          const value = pr.value ?? pr.name  ?? pr.label ?? '';
+          return { name: String(name), value: String(value), vval: norm(value) };
+        }).filter(p => p.value !== '');
 
         const treatAsText = isTextLikeByType(v) || propsArePlaceholders(props);
 
-        // 1) text-like (or placeholder props) -> real input/textarea
+        // 1) text-like -> real input/textarea
         if (treatAsText) {
-          const ph = props.find(p => (p.name || p.value));
-          const placeholder = (ph?.name || ph?.value || vName || 'Enter value');
-
+          // placeholder: خذه من أول prop إن وجد، وإلا من اسم الفاريشن
+          const ph = props[0]?.name || props[0]?.value || vRawName || 'Enter value';
+          // نوع الإدخال حسب الاسم إذا لم يحدده الـ type:
           let inputType = 'text';
-          if (type === 'email') inputType = 'email';
-          else if (type === 'password') inputType = 'password';
+          const low = vRawName.toLowerCase();
+          if (type === 'email' || low.includes('email')) inputType = 'email';
+          else if (type === 'password' || low.includes('pass')) inputType = 'password';
           else if (type === 'number') inputType = 'number';
 
-          const control = (type === 'textarea')
-            ? `<textarea class="var-input" rows="3" data-vname="${vName}" placeholder="${placeholder}"></textarea>`
-            : `<input class="var-input" type="${inputType}" data-vname="${vName}" placeholder="${placeholder}">`;
+          const control = (type === 'textarea' || low.includes('code'))
+            ? `<textarea class="var-input" rows="3" data-vkey="${vKey}" data-vname="${vRawName}" placeholder="${ph}"></textarea>`
+            : `<input class="var-input" type="${inputType}" data-vkey="${vKey}" data-vname="${vRawName}" placeholder="${ph}">`;
 
           return `
             <label class="var-block input">
-              <div class="var-title">${vName}</div>
+              <div class="var-title">${vRawName.trim()}</div>
               ${control}
             </label>
           `;
@@ -321,12 +332,12 @@ async function loadProduct({ productId = null, slug = null } = {}) {
         // 2) dropdown
         if (type === 'dropdown' && props.length) {
           const opts = ['<option value="">— Select —</option>']
-            .concat(props.map(pr => `<option value="${pr.value}">${pr.name}</option>`))
+            .concat(props.map(pr => `<option value="${pr.vval}" data-raw="${pr.value}">${pr.name}</option>`))
             .join('');
           return `
             <label class="var-block dropdown">
-              <div class="var-title">${vName}</div>
-              <select class="var-select" data-vname="${vName}">
+              <div class="var-title">${vRawName.trim()}</div>
+              <select class="var-select" data-vkey="${vKey}" data-vname="${vRawName}">
                 ${opts}
               </select>
             </label>
@@ -337,14 +348,15 @@ async function loadProduct({ productId = null, slug = null } = {}) {
         if (type === 'color' && props.length) {
           const btns = props.map(pr => `
             <button type="button" class="var-btn var-color"
-                    data-vname="${vName}" data-vval="${pr.value}" title="${pr.name}">
+                    data-vkey="${vKey}" data-vname="${vRawName}"
+                    data-vval="${pr.vval}" data-raw="${pr.value}" title="${pr.name}">
               <span class="swatch" style="background:${pr.value};"></span>
               <span class="swatch-label">${pr.name}</span>
             </button>
           `).join('');
           return `
             <div class="var-block colors">
-              <div class="var-title">${vName}</div>
+              <div class="var-title">${vRawName.trim()}</div>
               <div class="var-options">${btns}</div>
             </div>
           `;
@@ -352,20 +364,26 @@ async function loadProduct({ productId = null, slug = null } = {}) {
 
         // 4) buttons (default)
         if (props.length) {
-          const defaultVal = v.default ?? (v.auto_select_first ? String(props[0].value) : null);
-
+          const defaultVal = v.default ?? (v.auto_select_first ? props[0].vval : null);
           const btns = props.map(pr => `
-            <button type="button" class="var-btn${defaultVal && String(defaultVal)===String(pr.value) ? ' active':''}"
-                    data-vname="${vName}" data-vval="${pr.value}">
+            <button type="button" class="var-btn${defaultVal && defaultVal === pr.vval ? ' active':''}"
+                    data-vkey="${vKey}" data-vname="${vRawName}"
+                    data-vval="${pr.vval}" data-raw="${pr.value}">
               ${pr.name}
             </button>
           `).join('');
 
-          if (defaultVal != null && selected[vName] == null) selected[vName] = String(defaultVal);
+          // set default selection once
+          if (defaultVal != null && !selected[vKey]) {
+            selected[vKey] = defaultVal;
+            // ابقِ نسخة العرض خام بدون trim
+            const rawForDefault = rawProps.find(x => norm(x.value ?? x.name ?? '') === defaultVal);
+            selectedDisplay[vRawName] = String(rawForDefault?.value ?? rawForDefault?.name ?? defaultVal);
+          }
 
           return `
             <div class="var-block buttons">
-              <div class="var-title">${vName}</div>
+              <div class="var-title">${vRawName.trim()}</div>
               <div class="var-options">${btns}</div>
             </div>
           `;
@@ -374,8 +392,10 @@ async function loadProduct({ productId = null, slug = null } = {}) {
         // 5) fallback: simple input
         return `
           <label class="var-block input">
-            <div class="var-title">${vName || 'Option'}</div>
-            <input class="var-input" type="text" data-vname="${vName || 'Option'}" placeholder="${vName || 'Option'}">
+            <div class="var-title">${(vRawName || 'Option').trim()}</div>
+            <input class="var-input" type="text"
+                   data-vkey="${vKey}" data-vname="${vRawName}"
+                   placeholder="${vRawName || 'Option'}">
           </label>
         `;
       }).join('');
@@ -411,7 +431,7 @@ async function loadProduct({ productId = null, slug = null } = {}) {
           <div id="pdVarsWrap">${renderVariations()}</div>
 
           <div class="pd-actions">
-            <button id="buyNowBtn" class="btn primary">Click here to buy</button>
+            <button id="buyNowBtn" class="btn primary">${p.buy_now_text || 'Click here to buy'}</button>
             <button id="addToCartBtn" class="btn">Add to cart</button>
           </div>
 
@@ -452,33 +472,45 @@ async function loadProduct({ productId = null, slug = null } = {}) {
     refreshMeta();
 
     // ---------- variation events ----------
+    // selects
     box.querySelectorAll('.var-select').forEach(sel=>{
       sel.addEventListener('change', ()=>{
-        const name = sel.dataset.vname;
-        const val  = sel.value || null;
-        if (val) selected[name] = val; else delete selected[name];
+        const vKey  = sel.dataset.vkey;
+        const vName = sel.dataset.vname;
+        const raw   = sel.options[sel.selectedIndex]?.getAttribute('data-raw') || sel.value;
+        selected[vKey]        = norm(sel.value || '');
+        selectedDisplay[vName]= raw;
         refreshMeta();
       });
     });
+
+    // buttons
     box.querySelectorAll('.var-btn').forEach(btn=>{
       btn.addEventListener('click', ()=>{
-        const vname = btn.dataset.vname;
-        const vval  = btn.dataset.vval;
+        const vKey  = btn.dataset.vkey;
+        const vName = btn.dataset.vname;
+        const vVal  = btn.dataset.vval || '';
+        const raw   = btn.getAttribute('data-raw') || vVal;
+
         btn.closest('.var-block')?.querySelectorAll('.var-btn').forEach(b=>b.classList.remove('active'));
         btn.classList.add('active');
-        selected[vname] = vval;
+
+        selected[vKey]         = norm(vVal);
+        selectedDisplay[vName] = raw;
         refreshMeta();
       });
     });
+
+    // text inputs / textareas
     box.querySelectorAll('.var-input').forEach(inp=>{
       const apply = () => {
-        const name = inp.dataset.vname;
-        const val  = inp.value?.trim();
-        if (val) selected[name] = val; else delete selected[name];
+        const vKey  = inp.dataset.vkey;
+        const vName = inp.dataset.vname;
+        const val   = inp.value ?? '';
+        selected[vKey]         = norm(val);
+        selectedDisplay[vName] = val; // احتفظ بالنص كما أدخله المستخدم
       };
-      inp.addEventListener('input', apply);
-      inp.addEventListener('change', apply);
-      inp.addEventListener('blur', apply);
+      ['input','change','blur'].forEach(ev => inp.addEventListener(ev, apply));
     });
 
     // ---------- actions ----------
@@ -489,7 +521,7 @@ async function loadProduct({ productId = null, slug = null } = {}) {
         name: p.name || '',
         thumb: p.thumb || (Array.isArray(p.images) ? p.images[0] : '')
       },
-      selections: { ...selected },
+      selections: { ...selectedDisplay }, // اعرض القيم كما هي
       variant: selectedVariant ? {
         id: selectedVariant.id || null,
         taager_code: selectedVariant.taager_code || null,
@@ -507,9 +539,17 @@ async function loadProduct({ productId = null, slug = null } = {}) {
     box.querySelector('#buyNowBtn')?.addEventListener('click', ()=>{
       const missing = variations
         .filter(isStructured)
-        .filter(v => !selected[v.name])
-        .map(v => v.name);
-      if (missing.length) { alert(`Please select: ${missing.join(', ')}`); return; }
+        .map(v => norm(v.name))
+        .filter(k => !selected[k]);
+
+      if (missing.length) {
+        // رجّع أسماء العرض بدل المفاتيح المطبّعة
+        const missingDisplay = variations
+          .filter(v => missing.includes(norm(v.name)))
+          .map(v => String(v.name).trim());
+        alert(`Please select: ${missingDisplay.join(', ')}`);
+        return;
+      }
 
       const draft = buildDraft();
       try { sessionStorage.setItem('checkoutDraft', JSON.stringify(draft)); } catch {}
