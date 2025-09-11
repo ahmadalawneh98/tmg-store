@@ -1,4 +1,4 @@
-// /scripts/api.js - FIXED VERSION (with safe fallbacks)
+// /scripts/api.js - FIXED VERSION (with safe fallbacks + get-one endpoints)
 const proxy = '/api/categories';
 const productsProxy = '/api/products';
 
@@ -39,9 +39,7 @@ export async function fetchCategoriesByParent(parentId) {
 }
 
 /* ========= Products API ========= */
-/**
- * يجلب المنتجات عامّة (بدون join)
- */
+/** يجلب المنتجات عامة (قائمة) */
 export async function fetchAllProducts({
   page = 1,
   limit = 24,
@@ -54,17 +52,41 @@ export async function fetchAllProducts({
   url.searchParams.set('limit', limit);
   url.searchParams.set('sort', sort);
   if (fields) url.searchParams.set('fields', fields);
-  if (join) url.searchParams.set('join', join);
+  if (join)   url.searchParams.set('join', join);
 
   const r = await fetch(url.toString());
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
+/** ✅ منتج واحد بالـ ID (يستخدم GET /products/:id عبر البروكسي ?id=) */
+export async function fetchProductById(id, { join = 'categories' } = {}) {
+  if (!id) throw new Error('fetchProductById: id is required');
+  const url = new URL(productsProxy, location.origin);
+  url.searchParams.set('id', String(id));
+  if (join) url.searchParams.set('join', join);
+
+  const r = await fetch(url.toString());
+  if (!r.ok) throw new Error(await r.text());
+  return r.json(); // يرجع كائن المنتج مباشرة
+}
+
+/** منتج واحد بالـ slug (fallback عند غياب id) */
+export async function fetchProductBySlug(slug, { join = 'categories' } = {}) {
+  if (!slug) throw new Error('fetchProductBySlug: slug is required');
+  const url = new URL(productsProxy, location.origin);
+  url.searchParams.set('limit', '1');
+  if (join) url.searchParams.set('join', join);
+  url.searchParams.append('filter', `slug||eq||${String(slug)}`);
+
+  const r = await fetch(url.toString());
+  if (!r.ok) throw new Error(await r.text());
+  const j = await r.json();
+  return toArrayData(j)[0] ?? null; // يعيد منتجًا واحدًا أو null
+}
+
 /* ======= Low-level helpers for categories join ======= */
-/**
- * صفحة واحدة مع join=categories (بدون fields لتفادي data:[])
- */
+/** صفحة واحدة مع join=categories (بدون fields لتفادي data:[]) */
 export async function fetchProductsPageWithCategories({ page = 1, limit = 24 } = {}) {
   const url = new URL(productsProxy, location.origin);
   url.searchParams.set('page', String(page));
@@ -82,9 +104,7 @@ export async function fetchProductsPageWithCategories({ page = 1, limit = 24 } =
   };
 }
 
-/**
- * يجلب عدة صفحات ثم يفلتر محليًا حسب categoryId أو slug
- */
+/** يجلب عدة صفحات ثم يفلتر محليًا حسب categoryId أو slug */
 export async function fetchProductsByCategoryClientSide({
   categoryId = null,
   slug = null,
@@ -143,7 +163,9 @@ async function fetchProductsByCategoriesServer(ids = [], { page = 1, limit = 24 
   url.searchParams.set('join', 'categories');
 
   const op = onlyIds.length === 1 ? 'eq' : '$in';
-  url.searchParams.append('filter', `categories.id||${op}||${op === '$in' ? onlyIds.join(',') : onlyIds[0]}`);
+  url.searchParams.append('filter',
+    `categories.id||${op}||${op === '$in' ? onlyIds.join(',') : onlyIds[0]}`
+  );
 
   const r = await fetch(url.toString());
   if (!r.ok) throw new Error(await r.text());
@@ -151,46 +173,34 @@ async function fetchProductsByCategoriesServer(ids = [], { page = 1, limit = 24 
 }
 
 /* ========= High-level APIs (with fallback to client-side filtering) ========= */
-/**
- * منتجات حسب تصنيف واحد:
- * - يحاول فلترة السيرفر أولًا
- * - إن رجع فاضي: يستخدم فلترة محلية عبر جلب صفحات مع join=categories
- */
+/** تصنيف واحد: محاولة سيرفر أولًا ثم fallback محلي */
 export async function fetchProductsByCategory(categoryId, {
   page = 1,
   limit = 24,
   sort = 'created_at,DESC', // غير مستخدم في fallback لكن نُبقيه للتناسق
-  // ⚠️ لا نضع "categories" ضمن fields عندما نستخدم join=categories
-  fields = 'id,name,thumb,price,sale_price,slug,images,quantity',
+  fields = 'id,name,thumb,price,sale_price,slug,images,quantity', // ⚠️ لا نضع "categories" ضمن fields عند join
   join = 'categories',
-  slug = null,          // يمكن تمرير slug لاستخدامه في fallback
-  maxPages = 10         // عدد صفحات أقصى للـ fallback
+  slug = null,
+  maxPages = 10
 } = {}) {
   try {
     const sr = await fetchProductsByCategoryServer(categoryId, { page, limit });
     const data = toArrayData(sr);
     if (data.length) return { data };
     // fallback
-    const fb = await fetchProductsByCategoryClientSide({ categoryId, slug, maxPages, limit });
-    return fb;
-  } catch (e) {
-    // في حالة خطأ من السيرفر، جرّب fallback مباشرة
-    const fb = await fetchProductsByCategoryClientSide({ categoryId, slug, maxPages, limit });
-    return fb;
+    return await fetchProductsByCategoryClientSide({ categoryId, slug, maxPages, limit });
+  } catch {
+    return await fetchProductsByCategoryClientSide({ categoryId, slug, maxPages, limit });
   }
 }
 
-/**
- * منتجات حسب عدة تصنيفات (أب + أبناء):
- * - يحاول فلترة السيرفر ($in/eq)
- * - إن رجع فاضي: يجلب صفحات ويُفلتر محليًا على المعرّفات المرسلة
- */
+/** عدة تصنيفات: محاولة سيرفر أولًا ثم fallback محلي */
 export async function fetchProductsByCategories(ids = [], {
   page = 1,
   limit = 24,
   sort = 'created_at,DESC',
   fields = 'id,name,thumb,price,sale_price,slug,images,quantity',
-  join   = 'categories',
+  join = 'categories',
   maxPages = 10
 } = {}) {
   const onlyIds = (ids || []).filter(Boolean).map(String);
@@ -200,16 +210,20 @@ export async function fetchProductsByCategories(ids = [], {
     const sr = await fetchProductsByCategoriesServer(onlyIds, { page, limit });
     const data = toArrayData(sr);
     if (data.length) return { data };
-    // fallback: فلترة محلية
+
+    // fallback محلي
     const { data: pages } = await fetchProductsByCategoryClientSide({ categoryId: onlyIds[0], maxPages, limit });
     const setIds = new Set(onlyIds.map(String));
-    const filtered = (pages || []).filter(p => (p?.categories || []).some(c => setIds.has(String(c?.id))));
+    const filtered = (pages || []).filter(p =>
+      (p?.categories || []).some(c => setIds.has(String(c?.id)))
+    );
     return { data: filtered };
-  } catch (e) {
-    // لو فشل السيرفر، نفّذ fallback
+  } catch {
     const { data: pages } = await fetchProductsByCategoryClientSide({ categoryId: onlyIds[0], maxPages, limit });
     const setIds = new Set(onlyIds.map(String));
-    const filtered = (pages || []).filter(p => (p?.categories || []).some(c => setIds.has(String(c?.id))));
+    const filtered = (pages || []).filter(p =>
+      (p?.categories || []).some(c => setIds.has(String(c?.id)))
+    );
     return { data: filtered };
   }
 }

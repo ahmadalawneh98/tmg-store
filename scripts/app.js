@@ -97,21 +97,176 @@ function renderCategories(items = []) {
   });
 }
 
+
+function showSection(idToShow) {
+  const ids = ['categories', 'products', 'productPage'];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = (id === idToShow) ? '' : 'none';
+  });
+}
+
 function renderProducts(items = []) {
   const grid = document.getElementById('productsGrid');
   grid.innerHTML = '';
   const tpl = document.getElementById('productCardTpl').content;
+
   items.forEach(it => {
     const n = tpl.cloneNode(true);
-    n.querySelector('img').src = it.image || '';
-    n.querySelector('img').alt = it.title || 'Product';
-    n.querySelector('.title').textContent = it.title || 'Product';
-    n.querySelector('.amount').textContent = (it.price ?? 0).toFixed(2);
-    n.querySelector('.buy a').href = it.url || '#';
+
+    const card    = n.querySelector('.card');
+    const img     = n.querySelector('img');
+    const titleEl = n.querySelector('.title');
+    const amount  = n.querySelector('.amount');
+    const buyA    = n.querySelector('.buy a');
+
+    img.src = it.image || '';
+    img.alt = it.title || 'Product';
+    titleEl.textContent = it.title || 'Product';
+    amount.textContent = (it.price ?? 0).toFixed(2);
+
+    // استخرج الـ slug إن كان موجودًا في it.slug أو من it.url (#/product/slug)
+    const slug = it.slug || (it.url && it.url.startsWith('#/product/')
+                  ? it.url.split('/').pop()
+                  : '');
+    card.dataset.id = it.id ?? '';
+    card.dataset.slug = slug ?? '';
+
+    // زر الشراء يذهب لنفس صفحة المنتج (SPA) إن توفر slug، وإلا إلى it.url
+    buyA.href = slug ? `#/product/${slug}` : (it.url || '#');
+
+    // اجعل الكارت بأكمله يفتح صفحة المنتج
+    card.style.cursor = 'pointer';
+    card.addEventListener('click', (e) => {
+      // لو النقر على زر الشراء، اترك الرابط يعمل طبيعيًا
+      if (e.target.closest('.buy')) return;
+
+      if (slug) {
+        navigateToProduct(it.id, slug);
+      } else if (it.url) {
+        location.href = it.url;
+      }
+    });
+
     grid.appendChild(n);
   });
+
   attachTilt(grid);
 }
+
+async function loadProduct({ productId = null, slug = null } = {}) {
+  showSection('productPage');
+  const box = document.getElementById('productDetails');
+  box.innerHTML = '<div class="loading">Loading product…</div>';
+
+  try {
+    let p;
+
+    if (productId) {
+      // يستخدم /api/products?id=... → يمرر إلى GET /products/:id
+      const r = await fetch(`/api/products?id=${encodeURIComponent(productId)}&join=categories`);
+      if (!r.ok) throw new Error(await r.text());
+      p = await r.json(); // يرجع كائن المنتج مباشرة
+    } else {
+      // fallback بالـ slug عبر الفلترة
+      const url = new URL('/api/products', location.origin);
+      url.searchParams.append('filter', `slug||eq||${slug}`);
+      url.searchParams.set('limit', '1');
+      url.searchParams.set('join', 'categories');
+      const r = await fetch(url.toString());
+      if (!r.ok) throw new Error(await r.text());
+      const j = await r.json();
+      p = (Array.isArray(j) ? j : (j?.data ?? []))[0] || null;
+    }
+
+    if (!p) { box.innerHTML = '<div class="error">Product not found</div>'; return; }
+
+    const price = Number(p.sale_price || 0) > 0 ? p.sale_price : p.price;
+    const img   = p.thumb || (Array.isArray(p.images) ? p.images[0] : '') || '';
+    const cats  = Array.isArray(p.categories) ? p.categories : [];
+
+    box.innerHTML = `
+      <article class="product-details">
+        <div class="pd-media"><img src="${img}" alt="${p.name || 'Product'}" /></div>
+        <div class="pd-body">
+          <h2>${p.name || 'Product'}</h2>
+          <div class="pd-price">€ ${Number(price || 0).toFixed(2)}</div>
+          ${p.description ? `<div class="pd-desc">${p.description}</div>` : ''}
+          ${cats.length ? `<div class="pd-cats">Categories: ${cats.map(c=>c.name).join(', ')}</div>` : ''}
+          <div class="pd-actions">
+            <a class="btn primary" target="_blank" rel="noopener" href="#/checkout/${p.slug || p.id}">Buy Now</a>
+            <button id="pdBack" class="btn">Back</button>
+          </div>
+        </div>
+      </article>
+    `;
+    document.getElementById('pdBack')?.addEventListener('click', () => history.back());
+  } catch (err) {
+    console.error(err);
+    box.innerHTML = '<div class="error">Error loading product</div>';
+  }
+}
+
+
+async function loadProduct({ productId = null, slug = null } = {}) {
+  showSection('productPage');
+
+  const box = document.getElementById('productDetails');
+  box.innerHTML = '<div class="loading">Loading product…</div>';
+
+  try {
+    // نحاول أولاً عبر الـ slug إن وجد
+    const url = new URL('/api/products', location.origin);
+    if (slug) {
+      url.searchParams.append('filter', `slug||eq||${slug}`);
+    } else if (productId) {
+      url.searchParams.append('filter', `id||eq||${productId}`);
+    }
+    url.searchParams.set('limit', '1');
+    url.searchParams.set('join', 'categories');
+
+    const r = await fetch(url.toString());
+    if (!r.ok) throw new Error(await r.text());
+    const j = await r.json();
+    const arr = Array.isArray(j) ? j : (j?.data ?? []);
+    const p = arr[0];
+
+    if (!p) {
+      box.innerHTML = '<div class="error">Product not found</div>';
+      return;
+    }
+
+    const price = Number(p.sale_price || 0) > 0 ? p.sale_price : p.price;
+    const img = p.thumb || (Array.isArray(p.images) ? p.images[0] : '') || '';
+    const cats = Array.isArray(p.categories) ? p.categories : [];
+
+    box.innerHTML = `
+      <article class="product-details">
+        <div class="pd-media">
+          <img src="${img}" alt="${p.name || 'Product'}" />
+        </div>
+        <div class="pd-body">
+          <h2>${p.name || 'Product'}</h2>
+          <div class="pd-price">€ ${Number(price || 0).toFixed(2)}</div>
+          ${p.description ? `<div class="pd-desc">${p.description}</div>` : ''}
+          ${cats.length ? `<div class="pd-cats">Categories: ${cats.map(c=>c.name).join(', ')}</div>` : ''}
+          <div class="pd-actions">
+            <a class="btn primary" target="_blank" rel="noopener" href="#/checkout/${p.slug || p.id}">Buy Now</a>
+            <button id="pdBack" class="btn">Back</button>
+          </div>
+        </div>
+      </article>
+    `;
+
+    // زر الرجوع داخل صفحة المنتج
+    document.getElementById('pdBack')?.addEventListener('click', () => history.back());
+  } catch (err) {
+    console.error(err);
+    box.innerHTML = '<div class="error">Error loading product</div>';
+  }
+}
+
 
 /* ========= Products helpers ========= */
 function pickPrice(p){
@@ -121,13 +276,18 @@ function pickPrice(p){
 }
 
 function mapProducts(raw = []) {
-  return raw.map(p => ({
-    id:    p?.id ?? p?._id ?? p?.uuid ?? null,
-    title: p?.name ?? 'Product',
-    image: p?.thumb || (Array.isArray(p?.images) ? p.images[0] : '') || '',
-    price: pickPrice(p),
-    url:   p?.slug ? `#/product/${p.slug}` : '#'
-  }));
+  return raw.map(p => {
+    const id   = p?.id ?? p?._id ?? p?.uuid ?? null;
+    const slug = p?.slug ? String(p.slug) : (id ? String(id) : null);
+    return {
+      id,
+      slug, // ← مهم
+      title: p?.name ?? 'Product',
+      image: p?.thumb || (Array.isArray(p?.images) ? p.images[0] : '') || '',
+      price: pickPrice(p),
+      url:   slug ? `#/product/${slug}` : '#'
+    };
+  });
 }
 
 // FIXED: Re-using fetchProductsByCategories with the fix
@@ -262,20 +422,74 @@ if (categoriesGrid) {
 
 /* Browser Back/Forward support */
 window.addEventListener('popstate', async (e) => {
-  const parentId = e.state?.parentId ?? null;
-  console.log('Browser back/forward, parentId:', parentId); // For debugging
+  const state = e.state || {};
+
+  // لو احنا في صفحة منتج
+  if (state.view === 'product') {
+    await loadProduct({ productId: state.productId, slug: state.slug });
+    return;
+  }
+
+  // خلاف ذلك نرجع لصفحة التصنيفات/المنتجات
+  const parentId = state.parentId ?? null;
   setBackVisibility(parentId);
+  showSection('categories'); // تأكدنا نظهر أقسام القائمة
   await loadCategories(parentId);
 });
 
+
+function handleHashRoute() {
+  const hash = location.hash || '';
+
+  // /product/:slug
+  const m = hash.match(/^#\/product\/([^/?#]+)/);
+  if (m) {
+    const slug = decodeURIComponent(m[1]);
+    // خزّن حالة المتصفح ثم اعرض صفحة المنتج
+    history.replaceState({ view: 'product', slug }, '', `#/product/${slug}`);
+    loadProduct({ slug });
+    return;
+  }
+
+  // /categories (أو أي هاش آخر نرجّع للوضع الافتراضي)
+  if (hash.startsWith('#/categories') || hash === '' || hash === '#') {
+    history.replaceState({ parentId: null }, '', '#/categories');
+    setBackVisibility(null);
+    if (typeof showSection === 'function') {
+      showSection('categories');
+    }
+    loadCategories(null);
+  }
+}
+
+// استمع لتغيّر الهاش
+window.addEventListener('hashchange', handleHashRoute);
+
+
+/* ========= Boot ========= */
 /* ========= Boot ========= */
 (async () => {
   try {
-    console.log('Application starting...'); // For debugging
+    console.log('Application starting...');
+
+    // لو الرابط مباشر لمنتج (#/product/slug) افتحه مباشرة
+    const m = location.hash.match(/^#\/product\/([^/?#]+)/);
+    if (m) {
+      const slug = decodeURIComponent(m[1]);
+      history.replaceState({ view: 'product', slug }, '', `#/product/${slug}`);
+      await loadProduct({ slug });
+      console.log('Application loaded (product route)');
+      return;
+    }
+
+    // الوضع الافتراضي: صفحة التصنيفات
     history.replaceState({ parentId: null }, '', '#/categories');
     setBackVisibility(null);
+    if (typeof showSection === 'function') {
+      showSection('categories');
+    }
     await loadCategories(null);
-    console.log('Application loaded successfully'); // For debugging
+    console.log('Application loaded successfully');
   } catch (err) {
     console.error('Failed to load application:', err);
   }
