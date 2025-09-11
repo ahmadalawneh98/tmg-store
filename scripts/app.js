@@ -242,52 +242,92 @@ async function loadProduct({ productId = null, slug = null } = {}) {
     }
 
     // ——— UI للـ variations (نسخة مرنة) ———
-    function renderVariations() {
-      if (!variations.length) return '';
-      const blocks = variations.map(v => {
-        const rawProps =
-          Array.isArray(v.props)   ? v.props :
-          Array.isArray(v.values)  ? v.values :
-          Array.isArray(v.options) ? v.options : [];
-        const props = rawProps.map(pr => ({
-          name:  pr.name ?? pr.label ?? pr.value ?? '',
-          value: pr.value ?? pr.name  ?? pr.label ?? ''
-        })).filter(p => p.value !== '');
+  function renderVariations() {
+  if (!variations.length) return '';
 
-        if (!props.length) return '';
-        const type = String(v.type || 'buttons').toLowerCase();
+  const blocks = variations.map(v => {
+    const vName = String(v.name || '').trim();
+    const type  = String(v.type || 'buttons').toLowerCase();
 
-        if (type === 'dropdown') {
-          const opts = ['<option value="">— Select —</option>']
-            .concat(props.map(pr => `<option value="${pr.value}">${pr.name}</option>`))
-            .join('');
-          return `
-            <label class="var-block dropdown">
-              <div class="var-title">${v.name}</div>
-              <select class="var-select" data-vname="${v.name}">
-                ${opts}
-              </select>
-            </label>
-          `;
-        }
+    // Normalize props (if any)
+    const rawProps =
+      Array.isArray(v.props)   ? v.props :
+      Array.isArray(v.values)  ? v.values :
+      Array.isArray(v.options) ? v.options : [];
+    const props = rawProps.map(pr => ({
+      name:  pr.name ?? pr.label ?? pr.value ?? '',
+      value: pr.value ?? pr.name  ?? pr.label ?? ''
+    })).filter(p => p.value !== '');
 
-        const btns = props.map(pr => `
-          <button type="button" class="var-btn" data-vname="${v.name}" data-vval="${pr.value}">
-            ${pr.name}
-          </button>
-        `).join('');
-        return `
-          <div class="var-block ${type}">
-            <div class="var-title">${v.name}</div>
-            <div class="var-options">${btns}</div>
-          </div>
-        `;
-      }).join('');
+    // Detect text-like fields (IGN, Email, Pass, Recovery Codes, etc.)
+    const n = vName.toLowerCase();
+    const looksText =
+      type === 'text' || type === 'input' ||
+      n.includes('ign') || n.includes('name') || n.includes('login') ||
+      n.includes('user') || n.includes('email') || n.includes('mail') ||
+      n.includes('pass') || n.includes('password') ||
+      n.includes('recovery') || n.includes('code');
 
-      return blocks.trim()
-        ? `<div class="pd-variations"><h4>Options</h4>${blocks}</div>`
-        : '';
+    // For text-like fields, render <input>/<textarea> even if no props
+    if (looksText) {
+      // choose the appropriate control
+      let controlHtml = '';
+      if (n.includes('email')) {
+        controlHtml = `<input class="var-input" type="email" data-vname="${vName}" placeholder="enter ${vName}">`;
+      } else if (n.includes('pass')) {
+        controlHtml = `<input class="var-input" type="password" data-vname="${vName}" placeholder="enter ${vName}">`;
+      } else if (n.includes('code')) {
+        controlHtml = `<textarea class="var-input" rows="3" data-vname="${vName}" placeholder="enter ${vName}"></textarea>`;
+      } else {
+        controlHtml = `<input class="var-input" type="text" data-vname="${vName}" placeholder="enter ${vName}">`;
+      }
+
+      return `
+        <label class="var-block input">
+          <div class="var-title">${vName}</div>
+          ${controlHtml}
+        </label>
+      `;
     }
+
+    // Dropdown selector
+    if (type === 'dropdown' && props.length) {
+      const opts = ['<option value="">— Select —</option>']
+        .concat(props.map(pr => `<option value="${pr.value}">${pr.name}</option>`))
+        .join('');
+      return `
+        <label class="var-block dropdown">
+          <div class="var-title">${vName}</div>
+          <select class="var-select" data-vname="${vName}">
+            ${opts}
+          </select>
+        </label>
+      `;
+    }
+
+    // Buttons (default/radio-like)
+    if (props.length) {
+      const btns = props.map(pr => `
+        <button type="button" class="var-btn" data-vname="${vName}" data-vval="${pr.value}">
+          ${pr.name}
+        </button>
+      `).join('');
+      return `
+        <div class="var-block buttons">
+          <div class="var-title">${vName}</div>
+          <div class="var-options">${btns}</div>
+        </div>
+      `;
+    }
+
+    // Nothing to render
+    return '';
+  }).join('');
+
+  return blocks.trim()
+    ? `<div class="pd-variations"><h4>Options</h4>${blocks}</div>`
+    : '';
+}
 
     // ——— صفحة المنتج ———
     box.innerHTML = `
