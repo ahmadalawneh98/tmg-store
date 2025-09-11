@@ -97,7 +97,7 @@ function renderCategories(items = []) {
   });
 }
 
-
+/* show/hide sections */
 function showSection(idToShow) {
   const ids = ['categories', 'products', 'productPage'];
   ids.forEach(id => {
@@ -126,22 +126,20 @@ function renderProducts(items = []) {
     titleEl.textContent = it.title || 'Product';
     amount.textContent = (it.price ?? 0).toFixed(2);
 
-    // استخرج الـ slug إن كان موجودًا في it.slug أو من it.url (#/product/slug)
+    // slug from item or url
     const slug = it.slug || (it.url && it.url.startsWith('#/product/')
                   ? it.url.split('/').pop()
                   : '');
     card.dataset.id = it.id ?? '';
     card.dataset.slug = slug ?? '';
 
-    // زر الشراء يذهب لنفس صفحة المنتج (SPA) إن توفر slug، وإلا إلى it.url
+    // buy link
     buyA.href = slug ? `#/product/${slug}` : (it.url || '#');
 
-    // اجعل الكارت بأكمله يفتح صفحة المنتج
+    // open product on card click
     card.style.cursor = 'pointer';
     card.addEventListener('click', (e) => {
-      // لو النقر على زر الشراء، اترك الرابط يعمل طبيعيًا
-      if (e.target.closest('.buy')) return;
-
+      if (e.target.closest('.buy')) return; // let Buy button work normally
       if (slug) {
         navigateToProduct(it.id, slug);
       } else if (it.url) {
@@ -154,6 +152,13 @@ function renderProducts(items = []) {
 
   attachTilt(grid);
 }
+
+/* ========= Product navigation & loading ========= */
+async function navigateToProduct(productId, slug) {
+  history.pushState({ view: 'product', productId, slug }, '', `#/product/${slug || productId}`);
+  await loadProduct({ productId, slug });
+}
+
 async function loadProduct({ productId = null, slug = null } = {}) {
   showSection('productPage');
   const box = document.getElementById('productDetails');
@@ -162,13 +167,8 @@ async function loadProduct({ productId = null, slug = null } = {}) {
   try {
     let p;
 
-    if (productId) {
-      // يستخدم /api/products?id=... → يمرر إلى GET /products/:id
-      const r = await fetch(`/api/products?id=${encodeURIComponent(productId)}&join=categories`);
-      if (!r.ok) throw new Error(await r.text());
-      p = await r.json(); // يرجع كائن المنتج مباشرة
-    } else {
-      // fallback بالـ slug عبر الفلترة
+    // Prefer slug (works even if /api/products?id=... proxy isn't enabled)
+    if (slug) {
       const url = new URL('/api/products', location.origin);
       url.searchParams.append('filter', `slug||eq||${slug}`);
       url.searchParams.set('limit', '1');
@@ -177,6 +177,11 @@ async function loadProduct({ productId = null, slug = null } = {}) {
       if (!r.ok) throw new Error(await r.text());
       const j = await r.json();
       p = (Array.isArray(j) ? j : (j?.data ?? []))[0] || null;
+    } else if (productId) {
+      // Optional: get-one by id (requires /api/products?id=... support)
+      const r = await fetch(`/api/products?id=${encodeURIComponent(productId)}&join=categories`);
+      if (!r.ok) throw new Error(await r.text());
+      p = await r.json();
     }
 
     if (!p) { box.innerHTML = '<div class="error">Product not found</div>'; return; }
@@ -207,8 +212,6 @@ async function loadProduct({ productId = null, slug = null } = {}) {
   }
 }
 
-
-
 /* ========= Products helpers ========= */
 function pickPrice(p){
   const sp = Number(p?.sale_price || 0);
@@ -222,7 +225,7 @@ function mapProducts(raw = []) {
     const slug = p?.slug ? String(p.slug) : (id ? String(id) : null);
     return {
       id,
-      slug, // ← مهم
+      slug, // important for SPA route
       title: p?.name ?? 'Product',
       image: p?.thumb || (Array.isArray(p?.images) ? p.images[0] : '') || '',
       price: pickPrice(p),
@@ -236,28 +239,18 @@ async function loadProducts({ categoryId = null, categoriesIn = null, page = 1 }
   const grid = document.getElementById('productsGrid');
   if (grid) grid.innerHTML = '<div class="loading">Loading…</div>';
 
-  console.log('Loading products with params:', { categoryId, categoriesIn, page }); // For debugging
-
   let res;
   try {
     if (Array.isArray(categoriesIn) && categoriesIn.length) {
-      console.log('Using fetchProductsByCategories with IDs:', categoriesIn);
       res = await fetchProductsByCategories(categoriesIn, { page });
     } else if (categoryId) {
-      console.log('Using fetchProductsByCategory with ID:', categoryId);
       res = await fetchProductsByCategory(categoryId, { page });
     } else {
-      console.log('Using fetchAllProducts');
       res = await fetchAllProducts({ page });
     }
 
-    console.log('Products API response:', res); // For debugging
-
     const raw = Array.isArray(res) ? res : (res?.data ?? res ?? []);
-    console.log('Raw products after processing:', raw); // For debugging
-
     const items = mapProducts(raw);
-    console.log('Mapped products:', items); // For debugging
 
     if (items.length === 0) {
       grid.innerHTML = '<div class="no-products">No products found in this category</div>';
@@ -293,56 +286,43 @@ function setBackVisibility(parentId) {
 
 /* ========= Navigation (Categories/Sub-categories) - FIXED & IMPROVED ========= */
 async function loadCategories(parentId = null) {
-  console.log('Loading categories for parentId:', parentId); // For debugging
   setBackVisibility(parentId);
 
   try {
     const res = parentId ? await fetchCategoriesByParent(parentId) : await fetchTopCategories();
     const raw = Array.isArray(res) ? res : (res?.data ?? res ?? []);
-    console.log('Categories response:', raw); // For debugging
 
     if (parentId) {
-      // Collect IDs for direct children + parent
+      // parent + children products
       const childIds = raw.map(c => (c?.id ?? c?._id ?? c?.uuid ?? c?.pk)).filter(Boolean);
       const allIds = [parentId, ...childIds];
-      console.log('All category IDs (parent + children):', allIds); // For debugging
-
-      // Show products from parent + children (following original logic)
       await loadProducts({ categoriesIn: allIds, page: 1 });
 
-      // Scroll to products section
+      // scroll into view
       document.getElementById('products')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-      // If no sub-categories, just show products
-      if (childIds.length === 0) {
-        console.log('No subcategories found, showing only products');
-        return;
-      }
+      // if no sub-cats, stop (only products shown)
+      if (childIds.length === 0) return;
     } else {
-      // Top level: general products
       await loadProducts({ page: 1 });
     }
 
-    // Display category cards (if any)
+    // show categories grid (if any)
     const items = raw.map(c => ({
       id: c?.id ?? c?._id ?? c?.uuid ?? c?.pk ?? null,
       name: c?.name ?? 'Category',
       image: c?.thumb ?? c?.image ?? '',
       slug: c?.slug ?? ''
     }));
-    console.log('Mapped categories for display:', items); // For debugging
     renderCategories(items);
   } catch (error) {
     console.error('Error loading categories:', error);
     const grid = document.getElementById('categoriesGrid');
-    if (grid) {
-      grid.innerHTML = '<div class="error">Error loading categories</div>';
-    }
+    if (grid) grid.innerHTML = '<div class="error">Error loading categories</div>';
   }
 }
 
 async function navigateToCategory(categoryId, slug) {
-  console.log('Navigating to category:', categoryId, slug); // For debugging
   history.pushState({ parentId: categoryId }, '', `#/categories/${categoryId}${slug ? ('/' + slug) : ''}`);
   await loadCategories(categoryId);
 }
@@ -355,7 +335,6 @@ if (categoriesGrid) {
     if (!card) return;
     const id = card.dataset.id;
     const slug = card.dataset.slug;
-    console.log('Category card clicked:', { id, slug }); // For debugging
     if (!id) return console.warn('No category id on card. Check API mapping.');
     await navigateToCategory(id, slug);
   });
@@ -365,20 +344,18 @@ if (categoriesGrid) {
 window.addEventListener('popstate', async (e) => {
   const state = e.state || {};
 
-  // لو احنا في صفحة منتج
   if (state.view === 'product') {
     await loadProduct({ productId: state.productId, slug: state.slug });
     return;
   }
 
-  // خلاف ذلك نرجع لصفحة التصنيفات/المنتجات
   const parentId = state.parentId ?? null;
   setBackVisibility(parentId);
-  showSection('categories'); // تأكدنا نظهر أقسام القائمة
+  showSection('categories');
   await loadCategories(parentId);
 });
 
-
+/* Hash router (open product via #/product/slug directly) */
 function handleHashRoute() {
   const hash = location.hash || '';
 
@@ -386,51 +363,38 @@ function handleHashRoute() {
   const m = hash.match(/^#\/product\/([^/?#]+)/);
   if (m) {
     const slug = decodeURIComponent(m[1]);
-    // خزّن حالة المتصفح ثم اعرض صفحة المنتج
     history.replaceState({ view: 'product', slug }, '', `#/product/${slug}`);
     loadProduct({ slug });
     return;
   }
 
-  // /categories (أو أي هاش آخر نرجّع للوضع الافتراضي)
+  // default: /categories
   if (hash.startsWith('#/categories') || hash === '' || hash === '#') {
     history.replaceState({ parentId: null }, '', '#/categories');
     setBackVisibility(null);
-    if (typeof showSection === 'function') {
-      showSection('categories');
-    }
+    showSection('categories');
     loadCategories(null);
   }
 }
-
-// استمع لتغيّر الهاش
 window.addEventListener('hashchange', handleHashRoute);
 
-
-/* ========= Boot ========= */
 /* ========= Boot ========= */
 (async () => {
   try {
-    console.log('Application starting...');
-
-    // لو الرابط مباشر لمنتج (#/product/slug) افتحه مباشرة
+    // Open product directly if URL is #/product/slug
     const m = location.hash.match(/^#\/product\/([^/?#]+)/);
     if (m) {
       const slug = decodeURIComponent(m[1]);
       history.replaceState({ view: 'product', slug }, '', `#/product/${slug}`);
       await loadProduct({ slug });
-      console.log('Application loaded (product route)');
       return;
     }
 
-    // الوضع الافتراضي: صفحة التصنيفات
+    // Default: categories
     history.replaceState({ parentId: null }, '', '#/categories');
     setBackVisibility(null);
-    if (typeof showSection === 'function') {
-      showSection('categories');
-    }
+    showSection('categories');
     await loadCategories(null);
-    console.log('Application loaded successfully');
   } catch (err) {
     console.error('Failed to load application:', err);
   }
