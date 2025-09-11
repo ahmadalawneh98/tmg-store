@@ -240,45 +240,59 @@ async function loadProduct({ productId = null, slug = null } = {}) {
     }
 
     // 4) Render variations UI
-    function renderVariations() {
-      if (!variations.length) return '';
-      const blocks = variations.map(v => {
-        const props = Array.isArray(v.props) ? v.props : [];
-        if (!props.length) return '';
-        const type = (v.type || 'buttons').toLowerCase();
+   function renderVariations() {
+  if (!variations.length) return '';
 
-        if (type === 'dropdown') {
-          const opts = ['<option value="">— Select —</option>']
-            .concat(props.map(pr => {
-              const val = pr.value ?? pr.name ?? '';
-              return `<option value="${val}">${pr.name || pr.value}</option>`;
-            })).join('');
-          return `
-            <label class="var-block dropdown">
-              <div class="var-title">${v.name}</div>
-              <select class="var-select" data-vname="${v.name}">
-                ${opts}
-              </select>
-            </label>
-          `;
-        }
+  const blocks = variations.map(v => {
+    // اجلب المصفوفة مهما كان اسم الحقل
+    const rawProps =
+      Array.isArray(v.props)   ? v.props :
+      Array.isArray(v.values)  ? v.values :
+      Array.isArray(v.options) ? v.options : [];
 
-        // buttons / color → نستخدم أزرار (لو color ممكن تضيف CSS للدوائر)
-        const btns = props.map(pr => {
-          const val = pr.value ?? pr.name ?? '';
-          return `<button type="button" class="var-btn" data-vname="${v.name}" data-vval="${val}">
-                    ${pr.name || pr.value}
-                  </button>`;
-        }).join('');
-        return `
-          <div class="var-block ${type}">
-            <div class="var-title">${v.name}</div>
-            <div class="var-options">${btns}</div>
-          </div>
-        `;
-      }).join('');
-      return `<div class="pd-variations"><h4>Options</h4>${blocks}</div>`;
+    // طبّع العناصر إلى شكل موحّد {name, value}
+    const props = rawProps.map(pr => ({
+      name:  pr.name ?? pr.label ?? pr.value ?? '',
+      value: pr.value ?? pr.name  ?? pr.label ?? ''
+    })).filter(p => p.value !== '');
+
+    if (!props.length) return '';
+
+    const type = String(v.type || 'buttons').toLowerCase();
+
+    if (type === 'dropdown') {
+      const opts = ['<option value="">— Select —</option>']
+        .concat(props.map(pr => `<option value="${pr.value}">${pr.name}</option>`))
+        .join('');
+      return `
+        <label class="var-block dropdown">
+          <div class="var-title">${v.name}</div>
+          <select class="var-select" data-vname="${v.name}">
+            ${opts}
+          </select>
+        </label>
+      `;
     }
+
+    // buttons / color
+    const btns = props.map(pr => `
+      <button type="button" class="var-btn" data-vname="${v.name}" data-vval="${pr.value}">
+        ${pr.name}
+      </button>
+    `).join('');
+
+    return `
+      <div class="var-block ${type}">
+        <div class="var-title">${v.name}</div>
+        <div class="var-options">${btns}</div>
+      </div>
+    `;
+  }).join('');
+
+  // لو لم ينتج أي بلوك بعد التطبيع، لا تعرض القسم
+  if (!blocks.trim()) return '';
+  return `<div class="pd-variations"><h4>Options</h4>${blocks}</div>`;
+}
 
     // 5) Page HTML
     box.innerHTML = `
