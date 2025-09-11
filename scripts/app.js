@@ -169,6 +169,7 @@ async function navigateToProduct(productId, slug) {
 
 // ======= REPLACE ONLY THIS FUNCTION IN /scripts/app.js =======
 // ======= REPLACE THIS WHOLE FUNCTION =======
+// ======= REPLACE THIS WHOLE FUNCTION =======
 async function loadProduct({ productId = null, slug = null } = {}) {
   showView('product');
   const box = document.getElementById('productDetails');
