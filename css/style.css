@@ -834,7 +834,6 @@ img { max-width: 100%; height: auto; }
 }
 
 
-
 /* ======================= Variations (Scoped) ======================= */
 /* متغيرات محلية للقسم فقط حتى لا تؤثر على باقي الموقع */
 .pd-variations {
@@ -857,8 +856,23 @@ img { max-width: 100%; height: auto; }
   --pv-glow: 0 0 0 1px rgba(255,106,0,.22), 0 8px 24px rgba(255,106,0,.18);
 }
 
+/* ======================= Layout / Responsive ======================= */
+/* شبكة مرنة للبلوكات: عمود واحد على الموبايل، عمودان على الشاشات الأوسع */
+.pd-variations {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-top: 8px; /* التصاق مناسب تحت كلمة Options */
+}
+@media (min-width: 680px) {
+  .pd-variations { grid-template-columns: 1fr 1fr; }
+  /* اجعل بلوكات كبيرة (مثل textarea) تمتد بعرضين إذا أردت */
+  .pd-variations .var-block--wide { grid-column: span 2; }
+}
+
 /* العنوان العام */
 .pd-variations > h4 {
+  grid-column: 1 / -1;     /* حل الفراغ: العنوان يمتد عبر كل الأعمدة */
   margin: 0 0 8px;
   font-size: 1.05rem;
   font-weight: 800;
@@ -960,9 +974,7 @@ img { max-width: 100%; height: auto; }
   cursor: pointer;
   transition: transform .05s ease, box-shadow .2s, border-color .2s, background .2s;
 }
-.pd-variations .var-btn:hover {
-  border-color: rgba(255,255,255,.18);
-}
+.pd-variations .var-btn:hover { border-color: rgba(255,255,255,.18); }
 .pd-variations .var-btn:active { transform: translateY(1px); }
 .pd-variations .var-btn.active {
   background: linear-gradient(180deg, rgba(255,106,0,.16), rgba(255,106,0,.12));
@@ -979,21 +991,6 @@ img { max-width: 100%; height: auto; }
   font-size: .75rem;
   background: rgba(255,106,0,.16);
   border: 1px solid rgba(255,106,0,.38);
-}
-
-/* ======================= Layout / Responsive ======================= */
-/* شبكة مرنة للبلوكات: عمود واحد على الموبايل، عمودان على الشاشات الأوسع */
-.pd-variations {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
-}
-@media (min-width: 680px) {
-  .pd-variations {
-    grid-template-columns: 1fr 1fr;
-  }
-  /* اجعل بلوكات كبيرة (مثل textarea) تمتد بعرضين إذا أردت */
-  .pd-variations .var-block--wide { grid-column: span 2; }
 }
 
 /* تحسين اللمس على الهواتف */
