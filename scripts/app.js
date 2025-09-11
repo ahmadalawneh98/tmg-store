@@ -168,51 +168,138 @@ async function navigateToProduct(productId, slug) {
 }
 
 async function loadProduct({ productId = null, slug = null } = {}) {
+  // أظهر صفحة المنتج فقط
   showView('product');
+
   const box = document.getElementById('productDetails');
   box.innerHTML = '<div class="loading">Loading product…</div>';
 
   try {
     let p;
 
-    // Prefer slug (works even if /api/products?id=... proxy isn't enabled)
+    // نفضّل slug لأنه يعمل حتى بدون دعم ?id= في البروكسي
     if (slug) {
       const url = new URL('/api/products', location.origin);
       url.searchParams.append('filter', `slug||eq||${slug}`);
       url.searchParams.set('limit', '1');
-      url.searchParams.set('join', 'categories');
+      url.searchParams.set('join', 'categories,variations,variants'); // ⬅️ مهم
       const r = await fetch(url.toString());
       if (!r.ok) throw new Error(await r.text());
       const j = await r.json();
       p = (Array.isArray(j) ? j : (j?.data ?? []))[0] || null;
     } else if (productId) {
-      // Optional: get-one by id (requires /api/products?id=... support)
-      const r = await fetch(`/api/products?id=${encodeURIComponent(productId)}&join=categories`);
+      // جلب منتج واحد عبر id (يتطلب دعم ?id= في /api/products)
+      const r = await fetch(`/api/products?id=${encodeURIComponent(productId)}&join=categories,variations,variants`);
       if (!r.ok) throw new Error(await r.text());
-      p = await r.json();
+      p = await r.json(); // يرجع كائن المنتج مباشرة
     }
 
-    if (!p) { box.innerHTML = '<div class="error">Product not found</div>'; return; }
+    if (!p) {
+      box.innerHTML = '<div class="error">Product not found</div>';
+      return;
+    }
 
-    const price = Number(p.sale_price || 0) > 0 ? p.sale_price : p.price;
-    const img   = p.thumb || (Array.isArray(p.images) ? p.images[0] : '') || '';
-    const cats  = Array.isArray(p.categories) ? p.categories : [];
+    // --- تحضير البيانات ---
+    const basePrice = Number(p.price || 0);
+    const salePrice = Number(p.sale_price || 0);
+    const price = salePrice > 0 ? salePrice : basePrice;
 
+    const gallery =
+      Array.isArray(p.images) && p.images.length ? p.images
+      : (p.thumb ? [p.thumb] : []);
+
+    const cats = Array.isArray(p.categories) ? p.categories : [];
+    const inStock = p.track_stock ? Number(p.quantity || 0) > 0 : true;
+
+    // توليد واجهة الاختيارات (variations)
+    function renderVariations(prod) {
+      const vars = Array.isArray(prod.variations) ? prod.variations : [];
+      if (!vars.length) return '';
+
+      const blocks = vars.map(v => {
+        const props = Array.isArray(v.props) ? v.props : [];
+        const typeClass = (v.type || 'buttons'); // dropdown/buttons/color
+        const btns = props.map(pr =>
+          `<button class="var-btn" data-var="${v.name}" data-val="${pr.value}">${pr.name || pr.value}</button>`
+        ).join('');
+        return `
+          <div class="var-block ${typeClass}">
+            <div class="var-title">${v.name}</div>
+            <div class="var-options">${btns}</div>
+          </div>
+        `;
+      }).join('');
+
+      return `<div class="pd-variations"><h4>Options</h4>${blocks}</div>`;
+    }
+
+    // --- بناء صفحة المنتج ---
     box.innerHTML = `
-      <article class="product-details">
-        <div class="pd-media"><img src="${img}" alt="${p.name || 'Product'}" /></div>
+      <article class="product-details card-xl">
+        <div class="pd-media">
+          <div class="pd-gallery">
+            ${gallery.map((src,i)=>`
+              <img class="pd-img ${i===0?'active':''}" src="${src}" alt="${p.name || 'Product'} ${i+1}" />
+            `).join('')}
+          </div>
+          ${gallery.length>1 ? `
+            <div class="pd-thumbs">
+              ${gallery.map((src,i)=>`
+                <img class="pd-thumb ${i===0?'active':''}" src="${src}" data-index="${i}" alt="thumb ${i+1}" />
+              `).join('')}
+            </div>
+          `:''}
+        </div>
+
         <div class="pd-body">
           <h2>${p.name || 'Product'}</h2>
-          <div class="pd-price">€ ${Number(price || 0).toFixed(2)}</div>
+
+          <div class="pd-meta">
+            <div class="pd-price">
+              ${salePrice>0 ? `<del>€ ${basePrice.toFixed(2)}</del>` : ''}
+              <strong>€ ${Number(price||0).toFixed(2)}</strong>
+            </div>
+            <div class="pd-stock ${inStock?'ok':'out'}">
+              ${inStock ? (p.track_stock ? `In stock • ${Number(p.quantity||0)} pcs` : 'Available') : 'Out of stock'}
+            </div>
+            ${p.is_free_shipping ? `<div class="pd-badge free-ship">Free Shipping</div>` : ''}
+          </div>
+
+          <div class="pd-codes">
+            ${p.sku ? `<div><b>SKU:</b> ${p.sku}</div>` : ''}
+            ${p.taager_code ? `<div><b>Taager:</b> ${p.taager_code}</div>` : ''}
+          </div>
+
+          ${cats.length ? `<div class="pd-cats"><b>Categories:</b> ${cats.map(c=>c.name||c.slug||c.id).join(', ')}</div>` : ''}
+
+          ${renderVariations(p)}
+
           ${p.description ? `<div class="pd-desc">${p.description}</div>` : ''}
-          ${cats.length ? `<div class="pd-cats">Categories: ${cats.map(c=>c.name).join(', ')}</div>` : ''}
+
           <div class="pd-actions">
-            <a class="btn primary" target="_blank" rel="noopener" href="#/checkout/${p.slug || p.id}">Buy Now</a>
+            <a class="btn primary" target="_blank" rel="noopener" href="#/checkout/${p.slug || p.id}">
+              ${p.buy_now_text || 'Buy Now'}
+            </a>
             <button id="pdBack" class="btn">Back</button>
           </div>
         </div>
       </article>
     `;
+
+    // تبديل الصور عند الضغط على المصغّرات
+    const thumbs = box.querySelectorAll('.pd-thumb');
+    const imgs   = box.querySelectorAll('.pd-img');
+    thumbs.forEach(t=>{
+      t.addEventListener('click', ()=>{
+        const idx = Number(t.dataset.index||0);
+        imgs.forEach(i=>i.classList.remove('active'));
+        thumbs.forEach(i=>i.classList.remove('active'));
+        imgs[idx]?.classList.add('active');
+        t.classList.add('active');
+      });
+    });
+
+    // زر الرجوع
     document.getElementById('pdBack')?.addEventListener('click', () => history.back());
   } catch (err) {
     console.error(err);
