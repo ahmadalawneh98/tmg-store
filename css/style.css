@@ -1085,3 +1085,23 @@ img { max-width: 100%; height: auto; }
 select.var-select option {
   color: #000 !important; /* أسود صريح للخيارات */
 }
+
+/* Make all buttons show a pointer cursor */
+button,
+.btn,
+[role="button"],
+input[type="button"],
+input[type="submit"],
+.var-btn,
+.cart-qty button,
+.cart-remove {
+  cursor: pointer;
+}
+
+/* Optional: clearer state for disabled buttons */
+button:disabled,
+.btn:disabled,
+input[type="button"]:disabled,
+input[type="submit"]:disabled {
+  cursor: not-allowed;
+}
