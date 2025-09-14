@@ -1079,3 +1079,9 @@ img { max-width: 100%; height: auto; }
 .cart-total { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .cart-footer-actions { display: flex; gap: 10px; }
 .cart-footer .btn { flex: 1; }
+
+
+
+select.var-select option {
+  color: #000 !important; /* أسود صريح للخيارات */
+}
