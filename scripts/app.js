@@ -8,6 +8,13 @@ import {
 } from './api.js';
 
 
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('buyNowBtn');
+  if (btn) {
+    btn.textContent = 'Click here to buy';
+  }
+});
+
 
 // يعمل حتى لو العناصر انضافت لاحقاً
 document.addEventListener('change', (e) => {
