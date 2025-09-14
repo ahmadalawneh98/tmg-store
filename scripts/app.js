@@ -7,6 +7,27 @@ import {
   fetchProductsByCategories, // Re-added since it's fixed in api.js
 } from './api.js';
 
+
+
+document.addEventListener('DOMContentLoaded', () => {
+  const loginType = document.querySelector('select.var-select[data-vkey="Login Type"]');
+  const recoveryTA = document.querySelector('textarea.var-input[data-vkey="Recovery Codes"]');
+
+  if (loginType && recoveryTA) {
+    loginType.addEventListener('change', () => {
+      if (loginType.value === 'Activision') {
+        recoveryTA.value = 'user will enter';
+        recoveryTA.disabled = true;
+      } else {
+        recoveryTA.disabled = false;
+        recoveryTA.value = '';
+      }
+    });
+  }
+});
+
+
+
 /* ========= Year ========= */
 document.getElementById('y').textContent = new Date().getFullYear();
 
