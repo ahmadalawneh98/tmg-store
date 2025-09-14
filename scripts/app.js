@@ -18,9 +18,17 @@ document.addEventListener('change', (e) => {
   const ta  = box.querySelector('textarea.var-input[data-vkey="Recovery Codes"]');
   if (!ta) return;
 
-  const isActivision = (sel.value || '').trim().toLowerCase() === 'activision';
-  ta.disabled = isActivision;
-  ta.value    = isActivision ? '-' : '';
+  const val = (sel.value || '').trim().toLowerCase();
+
+  if (val === 'facebook') {
+    ta.disabled = false;
+    ta.value = '';
+    ta.placeholder = 'Enter recovery code';
+  } else {
+    ta.disabled = true;
+    ta.value = '';
+    ta.placeholder = 'Not required';
+  }
 
   // خلّي منطقك الداخلي يتحدّث (listeners) إن وُجد
   ta.dispatchEvent(new Event('input', { bubbles: true }));
