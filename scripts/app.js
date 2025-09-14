@@ -9,21 +9,27 @@ import {
 
 
 
-document.addEventListener('DOMContentLoaded', () => {
-  const loginType = document.querySelector('select.var-select[data-vkey="Login Type"]');
-  const recoveryTA = document.querySelector('textarea.var-input[data-vkey="Recovery Codes"]');
+// يعمل حتى لو العناصر انضافت لاحقاً
+document.addEventListener('change', (e) => {
+  const sel = e.target.closest('select.var-select[data-vkey="Login Type"]');
+  if (!sel) return;
 
-  if (loginType && recoveryTA) {
-    loginType.addEventListener('change', () => {
-      if (loginType.value === 'Activision') {
-        recoveryTA.value = 'user will enter';
-        recoveryTA.disabled = true;
-      } else {
-        recoveryTA.disabled = false;
-        recoveryTA.value = '';
-      }
-    });
-  }
+  const box = document.getElementById('productDetails') || document;
+  const ta  = box.querySelector('textarea.var-input[data-vkey="Recovery Codes"]');
+  if (!ta) return;
+
+  const isActivision = (sel.value || '').trim().toLowerCase() === 'activision';
+  ta.disabled = isActivision;
+  ta.value    = isActivision ? '-' : '';
+
+  // خلّي منطقك الداخلي يتحدّث (listeners) إن وُجد
+  ta.dispatchEvent(new Event('input', { bubbles: true }));
+});
+
+// يطبّق الحالة بدايةً لو كان فيه قيمة مختارة
+document.addEventListener('DOMContentLoaded', () => {
+  const sel = document.querySelector('select.var-select[data-vkey="Login Type"]');
+  if (sel) sel.dispatchEvent(new Event('change', { bubbles: true }));
 });
 
 
