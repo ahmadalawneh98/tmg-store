@@ -1115,8 +1115,11 @@ input[type="submit"]:disabled {
 
 /* ==== Layout hooks (fits your existing .checkout/.co-wrap style) ==== */
 
-#purchase{ display:none; }
-#purchase.open{ display:block; }
+#purchase { display: none; }
+#purchase.open { display: block; }
+
+/* إخفاء تفاصيل المنتج لما نكون على الدفع */
+#productDetails.is-hidden { display: none; }
 
 #purchase .co-wrap{ grid-template-columns: 1fr 360px; }
 #purchase .co-right .card{ background:#0f1318; border:1px solid #202a36; border-radius:14px; padding:14px; }

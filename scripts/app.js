@@ -211,15 +211,6 @@ async function navigateToProduct(productId, slug) {
   await loadProduct({ productId, slug });
 }
 
-function showCheckout(draft = null) {
-  // نُبقيك في صفحة المنتج ونفتح سكشن الشراء تحتها
-  const sec = document.getElementById('purchase');
-  if (!sec) return;
-  sec.classList.add('open');            // يزيل الإخفاء
-  sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  // خزّن/حمّل المسودة لو حاب تستخدمها لاحقًا
-  if (draft) { try { sessionStorage.setItem('checkoutDraft', JSON.stringify(draft)); } catch {} }
-}
 
 
 // ======= REPLACE THIS WHOLE FUNCTION =======
@@ -1108,11 +1099,26 @@ document.getElementById('checkoutForm')?.addEventListener('submit', (e)=>{
   alert('Order captured (wire this to your API).');
 });
 
-function hideCheckout() {
+function showCheckout(draft = null) {
   const sec = document.getElementById('purchase');
+  const details = document.getElementById('productDetails'); // نفس اللي بتكتب فيه loadProduct
   if (!sec) return;
-  sec.classList.remove('open');
-  // (اختياري لسهولة الوصول)
-  sec.setAttribute('aria-hidden', 'true');
+
+  // أخفي تفاصيل المنتج، وافتح الدفع
+  details?.classList.add('is-hidden');
+  sec.classList.add('open');
+  sec.removeAttribute('aria-hidden');
+  sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  if (draft) { try { sessionStorage.setItem('checkoutDraft', JSON.stringify(draft)); } catch {} }
 }
 
+function hideCheckout() {
+  const sec = document.getElementById('purchase');
+  const details = document.getElementById('productDetails');
+  if (!sec) return;
+
+  sec.classList.remove('open');
+  sec.setAttribute('aria-hidden', 'true');
+  details?.classList.remove('is-hidden'); // رجّع تفاصيل المنتج
+}
