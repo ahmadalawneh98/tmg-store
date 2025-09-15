@@ -7,6 +7,8 @@ import {
   fetchProductsByCategories, // Re-added since it's fixed in api.js
 } from './api.js';
 
+document.addEventListener('DOMContentLoaded', handleHashRoute);
+
 
 document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('buyNowBtn');
@@ -208,6 +210,17 @@ async function navigateToProduct(productId, slug) {
   history.pushState({ view: 'product', productId, slug }, '', `#/product/${slug || productId}`);
   await loadProduct({ productId, slug });
 }
+
+function showCheckout(draft = null) {
+  // نُبقيك في صفحة المنتج ونفتح سكشن الشراء تحتها
+  const sec = document.getElementById('purchase');
+  if (!sec) return;
+  sec.classList.add('open');            // يزيل الإخفاء
+  sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // خزّن/حمّل المسودة لو حاب تستخدمها لاحقًا
+  if (draft) { try { sessionStorage.setItem('checkoutDraft', JSON.stringify(draft)); } catch {} }
+}
+
 
 // ======= REPLACE THIS WHOLE FUNCTION =======
 // ======= REPLACE THIS WHOLE FUNCTION =======
@@ -597,6 +610,8 @@ async function loadProduct({ productId = null, slug = null } = {}) {
       const draft = buildDraft();
       try { sessionStorage.setItem('checkoutDraft', JSON.stringify(draft)); } catch {}
       history.pushState({ view: 'checkout', draft }, '', `#/checkout/${p.slug || (p.id || '')}`);
+      showCheckout(draft);
+
     });
 
     // Add to cart
@@ -746,6 +761,13 @@ if (categoriesGrid) {
 window.addEventListener('popstate', async (e) => {
   const state = e.state || {};
 
+  if (state.view === 'checkout') {
+    let draft = null;
+    try { draft = JSON.parse(sessionStorage.getItem('checkoutDraft') || 'null'); } catch {}
+    showCheckout(draft);
+    return;
+  }
+
   if (state.view === 'product') {
     await loadProduct({ productId: state.productId, slug: state.slug });
     return;
@@ -761,46 +783,50 @@ window.addEventListener('popstate', async (e) => {
 function handleHashRoute() {
   const hash = location.hash || '';
 
+  // /checkout/:slug
+  const mCheckout = hash.match(/^#\/checkout\/([^/?#]+)/);
+  if (mCheckout) {
+    const slug = decodeURIComponent(mCheckout[1]);
+    history.replaceState({ view: 'checkout', slug }, '', `#/checkout/${slug}`);
+    let draft = null;
+    try { draft = JSON.parse(sessionStorage.getItem('checkoutDraft') || 'null'); } catch {}
+    showCheckout(draft);
+    return;
+  }
+
   // /product/:slug
-  const m = hash.match(/^#\/product\/([^/?#]+)/);
-  if (m) {
-    const slug = decodeURIComponent(m[1]);
+  const mProd = hash.match(/^#\/product\/([^/?#]+)/);
+  if (mProd) {
+    hideCheckout(); // <-- مهم
+    const slug = decodeURIComponent(mProd[1]);
     history.replaceState({ view: 'product', slug }, '', `#/product/${slug}`);
     loadProduct({ slug });
     return;
   }
 
-  // default: /categories (+ products)
-  if (hash.startsWith('#/categories') || hash === '' || hash === '#') {
-    history.replaceState({ parentId: null }, '', '#/categories');
-    setBackVisibility(null);
+  // /categories/:id
+  const mCat = hash.match(/^#\/categories\/([^/?#]+)/);
+  if (mCat) {
+    hideCheckout(); // <-- مهم
+    const parentId = decodeURIComponent(mCat[1]);
+    history.replaceState({ parentId }, '', `#/categories/${parentId}`);
+    setBackVisibility(parentId);
     showView('list');
-    loadCategories(null);
+    loadCategories(parentId);
+    return;
   }
+
+  // default
+  hideCheckout(); // <-- مهم
+  history.replaceState({ parentId: null }, '', '#/categories');
+  setBackVisibility(null);
+  showView('list');
+  loadCategories(null);
 }
+
+
+
 window.addEventListener('hashchange', handleHashRoute);
-
-/* ========= Boot ========= */
-(async () => {
-  try {
-    // Open product directly if URL is #/product/slug
-    const m = location.hash.match(/^#\/product\/([^/?#]+)/);
-    if (m) {
-      const slug = decodeURIComponent(m[1]);
-      history.replaceState({ view: 'product', slug }, '', `#/product/${slug}`);
-      await loadProduct({ slug });
-      return;
-    }
-
-    // Default: categories + products
-    history.replaceState({ parentId: null }, '', '#/categories');
-    setBackVisibility(null);
-    showView('list');
-    await loadCategories(null);
-  } catch (err) {
-    console.error('Failed to load application:', err);
-  }
-})();
 
 /* ========= Mobile menu toggle ========= */
 const nav = document.querySelector('.nav');
@@ -984,3 +1010,117 @@ window.addEventListener('storage', (e) => { if (e.key === CART_KEY) { renderCart
 
 /* First render */
 renderCartCount();
+
+
+
+
+
+
+// ===== Tabs: activation + copy-to-clipboard =====
+(function initPayTabs(){
+  const header = document.querySelector('#payTabs .pay-tabs-header');
+  const live   = document.getElementById('payCopyLive');
+  if(!header) return;
+
+  header.addEventListener('click', (e)=>{
+    const btn = e.target.closest('.pay-tab-btn'); if(!btn) return;
+    const id  = btn.getAttribute('aria-controls');
+    // Deactivate others
+    header.querySelectorAll('.pay-tab-btn').forEach(b=>{
+      b.setAttribute('aria-selected', b===btn ? 'true' : 'false');
+      b.setAttribute('tabindex', b===btn ? '0' : '-1');
+    });
+    document.querySelectorAll('#payTabs .pay-tab-panel').forEach(p=>{
+      p.setAttribute('aria-hidden', p.id===id ? 'false' : 'true');
+    });
+    // Focus panel for a11y
+    document.getElementById(id)?.focus?.();
+  });
+
+  // Copy buttons
+  document.getElementById('payTabs')?.addEventListener('click', async (e)=>{
+    const c = e.target.closest('.pay-copy'); if(!c) return;
+    const txt = c.getAttribute('data-copy') || '';
+    try{
+      await navigator.clipboard.writeText(txt);
+      c.textContent = 'Copied';
+      setTimeout(()=>{ c.textContent = 'Copy'; }, 1200);
+      if(live) live.textContent = 'Copied to clipboard';
+    }catch{ if(live) live.textContent = 'Copy failed'; }
+  });
+})();
+
+// ===== Order Summary (uses your existing cart helpers) =====
+(function renderSummary(){
+  const wrap = document.getElementById('sumItems'); if(!wrap) return;
+  const items = (typeof getCart === 'function') ? getCart() : [];
+  if(items.length === 0){
+    wrap.innerHTML = '<div class="empty">Your cart is empty.</div>';
+  }else{
+    wrap.innerHTML = items.map(it=>{
+      const name = it?.product?.name || 'Product';
+      const img  = it?.product?.thumb || '';
+      const qty  = Number(it.quantity || 1);
+      const price= Number(it.price || 0);
+      const line = (qty*price).toFixed(2);
+      const opts = it.selections ? Object.entries(it.selections).map(([k,v])=>`${k}: ${v}`).join(' • ') : '';
+      return `
+        <div class="sum-item">
+          <img src="${img}" alt="${name}">
+          <div>
+            <h4>${name}</h4>
+            <div class="meta">${opts}</div>
+            <div class="meta">Qty: ${qty} × ${price.toFixed(2)}</div>
+          </div>
+          <div class="line">${line}</div>
+        </div>
+      `;
+    }).join('');
+  }
+  if(typeof cartTotal === 'function'){
+    const { sum, currency } = cartTotal();
+    document.getElementById('sumTotal').textContent = sum.toFixed(2);
+    document.getElementById('sumCurr').textContent  = currency;
+  }
+})();
+
+// Live updates when cart changes
+window.addEventListener('cart:updated', ()=>{
+  try { document.querySelector('#orderSummary .sum-items').innerHTML = ''; } catch {}
+  // re-render quickly:
+  const ev = new Event('DOMContentLoaded'); document.dispatchEvent(ev);
+});
+
+// Edit cart button -> open drawer (your helper)
+document.getElementById('editCart')?.addEventListener('click', ()=>{
+  if(typeof openCartDrawer === 'function') openCartDrawer();
+});
+
+// Submit order (placeholder: hook to your backend)
+document.getElementById('checkoutForm')?.addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.currentTarget).entries());
+  // Attach cart + selected payment tab
+  const activeTab = document.querySelector('.pay-tab-btn[aria-selected="true"]')?.id || '';
+  data.payment_method = activeTab.replace('tabbtn-',''); // paypal/uk/jo/other
+  data.cart = (typeof getCart === 'function') ? getCart() : [];
+  // TODO: send to your API
+  alert('Order captured (wire this to your API).');
+});
+
+function hideCheckout() {
+  const sec = document.getElementById('purchase');
+  if (!sec) return;
+  sec.classList.remove('open');
+  // (اختياري لسهولة الوصول)
+  sec.setAttribute('aria-hidden', 'true');
+}
+
+function showCheckout(draft = null) {
+  const sec = document.getElementById('purchase');
+  if (!sec) return;
+  sec.classList.add('open');
+  sec.removeAttribute('aria-hidden');
+  sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (draft) { try { sessionStorage.setItem('checkoutDraft', JSON.stringify(draft)); } catch {} }
+}

@@ -174,6 +174,147 @@
   </section>
 </div>
 
+
+
+
+
+<!-- ============ Purchase Section ============ -->
+<section id="purchase" class="checkout card-xl">
+  <div class="co-wrap">
+    <!-- LEFT: Payment Tabs + Form -->
+    <div class="co-left">
+
+      <!-- Payment Tabs -->
+      <section id="payTabs" class="pay-tabs">
+        <div class="pay-tabs-header" role="tablist" aria-label="Payment methods">
+          <button class="pay-tab-btn" type="button" role="tab" aria-selected="true" aria-controls="tab-paypal" id="tabbtn-paypal" tabindex="0">
+            PayPal (EU/Global)
+          </button>
+          <button class="pay-tab-btn" type="button" role="tab" aria-selected="false" aria-controls="tab-uk" id="tabbtn-uk" tabindex="-1">
+            Bank Transfer (UK)
+          </button>
+          <button class="pay-tab-btn" type="button" role="tab" aria-selected="false" aria-controls="tab-jo" id="tabbtn-jo" tabindex="-1">
+            CliQ (Jordan)
+          </button>
+          <button class="pay-tab-btn" type="button" role="tab" aria-selected="false" aria-controls="tab-other" id="tabbtn-other" tabindex="-1">
+            Western / Crypto / More
+          </button>
+        </div>
+
+        <!-- Panels -->
+        <div class="pay-tab-panel" id="tab-paypal" role="tabpanel" aria-labelledby="tabbtn-paypal" aria-hidden="false">
+          <div class="pay-card">
+            <p>PayPal is available for <b>all countries</b>.</p>
+            <a class="pay-link" href="https://www.paypal.me/Sabeeh48" target="_blank" rel="noopener">Pay with PayPal</a>
+            <div class="pay-note">After paying, enter your <b>Transfer Number</b> below.</div>
+          </div>
+        </div>
+
+        <div class="pay-tab-panel" id="tab-uk" role="tabpanel" aria-labelledby="tabbtn-uk" aria-hidden="true">
+          <div class="pay-card">
+            <div class="pay-note"><b>UK customers only.</b> PayPal is still available globally.</div>
+
+            <h4>Barclays Bank</h4>
+            <div class="pay-line">
+              <span class="pay-key">Account Name</span><span class="pay-val">Sabeeh Irfan</span>
+              <button class="pay-copy" data-copy="Sabeeh Irfan" type="button">Copy</button>
+            </div>
+            <div class="pay-line">
+              <span class="pay-key">Sort Code</span><span class="pay-val" dir="ltr">23-14-70</span>
+              <button class="pay-copy" data-copy="23-14-70" type="button">Copy</button>
+            </div>
+            <div class="pay-line">
+              <span class="pay-key">Account No.</span><span class="pay-val" dir="ltr">82937855</span>
+              <button class="pay-copy" data-copy="82937855" type="button">Copy</button>
+            </div>
+
+            <h4>Starling Bank</h4>
+            <div class="pay-line">
+              <span class="pay-key">Account Name</span><span class="pay-val">Sabeeh Irfan</span>
+              <button class="pay-copy" data-copy="Sabeeh Irfan" type="button">Copy</button>
+            </div>
+            <div class="pay-line">
+              <span class="pay-key">Sort Code</span><span class="pay-val" dir="ltr">60-83-71</span>
+              <button class="pay-copy" data-copy="60-83-71" type="button">Copy</button>
+            </div>
+            <div class="pay-line">
+              <span class="pay-key">Account No.</span><span class="pay-val" dir="ltr">40238561</span>
+              <button class="pay-copy" data-copy="40238561" type="button">Copy</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="pay-tab-panel" id="tab-jo" role="tabpanel" aria-labelledby="tabbtn-jo" aria-hidden="true">
+          <div class="pay-card">
+            <div class="pay-line">
+              <span class="pay-key">CliQ Alias</span><span class="pay-val">AMIR2107</span>
+              <button class="pay-copy" data-copy="AMIR2107" type="button">Copy</button>
+            </div>
+            <div class="pay-line">
+              <span class="pay-key">CliQ Alias</span><span class="pay-val">HAMZA2107</span>
+              <button class="pay-copy" data-copy="HAMZA2107" type="button">Copy</button>
+            </div>
+            <div class="pay-note">
+              Write: <b>Order Number + Your Name</b>. Then enter the <b>Transfer Number</b> below.
+            </div>
+          </div>
+        </div>
+
+        <div class="pay-tab-panel" id="tab-other" role="tabpanel" aria-labelledby="tabbtn-other" aria-hidden="true">
+          <div class="pay-card">
+            <p>For Western Union or Crypto, contact us:</p>
+            <a class="pay-link" href="https://wa.me/962786041666" target="_blank" rel="noopener">💬 WhatsApp</a>
+          </div>
+        </div>
+
+        <span class="visually-hidden" aria-live="polite" id="payCopyLive"></span>
+      </section>
+
+      <!-- Checkout Form -->
+      <form id="checkoutForm" class="co-form" autocomplete="on">
+        <div class="co-title">Please fill your information</div>
+
+        <div class="co-field">
+          <label for="full_name">Name</label>
+          <input id="full_name" name="full_name" type="text" class="global_input" required>
+        </div>
+
+        <div class="co-field">
+          <label for="phone">Phone number</label>
+          <input id="phone" name="phone" type="tel" class="global_input" required>
+        </div>
+
+        <div class="co-field">
+          <label for="insta">Instagram (optional)</label>
+          <input id="insta" name="insta" type="text" class="global_input" placeholder="@username or link">
+        </div>
+
+        <div class="co-field">
+          <label for="transfer_no">Transfer Number</label>
+          <textarea id="transfer_no" name="transfer_no" rows="3" class="global_textarea" placeholder="PayPal / Bank / CliQ reference"></textarea>
+        </div>
+
+        <div class="co-actions">
+          <button id="submitOrder" class="btn primary" type="submit">Buy now</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- RIGHT: Order Summary -->
+    <aside class="co-right" id="orderSummary">
+      <div class="summary card">
+        <h3 class="sum-title">Order Summary</h3>
+        <div class="sum-items" id="sumItems"></div>
+        <div class="sum-footer">
+          <div class="sum-line"><span>Total</span><strong><span id="sumTotal">0.00</span> <span id="sumCurr">USD</span></strong></div>
+          <button class="btn" id="editCart">Edit cart</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+</section>
+
+
 <script type="module" src="/scripts/app.js"></script>
 
 
