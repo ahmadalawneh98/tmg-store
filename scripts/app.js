@@ -1116,11 +1116,3 @@ function hideCheckout() {
   sec.setAttribute('aria-hidden', 'true');
 }
 
-function showCheckout(draft = null) {
-  const sec = document.getElementById('purchase');
-  if (!sec) return;
-  sec.classList.add('open');
-  sec.removeAttribute('aria-hidden');
-  sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  if (draft) { try { sessionStorage.setItem('checkoutDraft', JSON.stringify(draft)); } catch {} }
-}
