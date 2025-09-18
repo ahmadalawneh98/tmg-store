@@ -67,6 +67,8 @@ const io = new IntersectionObserver((es) => {
 }, { threshold: .1 });
 document.querySelectorAll('.reveal').forEach(el => io.observe(el));
 
+
+
 /* ========= Tilt on cards ========= */
 function attachTilt(root = document) {
   root.querySelectorAll('.tilt').forEach(card => {
@@ -787,13 +789,20 @@ window.addEventListener('popstate', async (e) => {
   await loadCategories(parentId);
 });
 
-/* Hash router (open product via #/product/slug directly) */
+// helper: أظهر/أخفِ الهيرو (.hero)
+function setHeroVisibility(show){
+  const hero = document.querySelector('.hero');
+  if (!hero) return;
+  hero.classList.toggle('is-hidden', !show);
+}
+
 function handleHashRoute() {
   const hash = location.hash || '';
 
   // /checkout/:slug
   const mCheckout = hash.match(/^#\/checkout\/([^/?#]+)/);
   if (mCheckout) {
+    setHeroVisibility(false); // اخفِ الهيرو
     const slug = decodeURIComponent(mCheckout[1]);
     history.replaceState({ view: 'checkout', slug }, '', `#/checkout/${slug}`);
     let draft = null;
@@ -805,6 +814,7 @@ function handleHashRoute() {
   // /product/:slug
   const mProd = hash.match(/^#\/product\/([^/?#]+)/);
   if (mProd) {
+    setHeroVisibility(false); // اخفِ الهيرو
     hideCheckout(); // <-- مهم
     const slug = decodeURIComponent(mProd[1]);
     history.replaceState({ view: 'product', slug }, '', `#/product/${slug}`);
@@ -812,9 +822,10 @@ function handleHashRoute() {
     return;
   }
 
-  // /categories/:id
+  // /categories/:id (تصنيف داخلي)
   const mCat = hash.match(/^#\/categories\/([^/?#]+)/);
   if (mCat) {
+    setHeroVisibility(false); // اخفِ الهيرو
     hideCheckout(); // <-- مهم
     const parentId = decodeURIComponent(mCat[1]);
     history.replaceState({ parentId }, '', `#/categories/${parentId}`);
@@ -824,7 +835,8 @@ function handleHashRoute() {
     return;
   }
 
-  // default
+  // default: الصفحة الرئيسية (top categories)
+  setHeroVisibility(true); // أظهر الهيرو في الهوم فقط
   hideCheckout(); // <-- مهم
   history.replaceState({ parentId: null }, '', '#/categories');
   setBackVisibility(null);

@@ -1287,3 +1287,8 @@ input[type="submit"]:disabled {
 #orderSummary .co-form {
   margin-top: 16px; /* عدل القيمة حسب الذوق (20px, 24px...) */
 }
+
+
+.hero.is-hidden {
+  display: none !important;
+}
