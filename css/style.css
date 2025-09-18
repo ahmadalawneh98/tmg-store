@@ -1110,6 +1110,8 @@ input[type="submit"]:disabled {
 
 /* ==== Layout hooks (fits your existing .checkout/.co-wrap style) ==== */
 /* ====== visiblity switching ====== */
+/* ==== Layout hooks (fits your existing .checkout/.co-wrap style) ==== */
+/* ====== visiblity switching ====== */
 #purchase { display: none; }
 #purchase.open { display: block; }
 #productDetails.is-hidden { display: none; }
@@ -1117,11 +1119,14 @@ input[type="submit"]:disabled {
 /* ====== layout ====== */
 #purchase .co-wrap{
   display:grid;
-  grid-template-columns:minmax(0,1fr) 360px;
+  grid-template-columns: repeat(2, minmax(0, 1fr)); /* كان: minmax(0,1fr) 360px */
   gap:16px;
   align-items:start;
   margin-top:12px;
 }
+#purchase .co-left,
+#purchase .co-right{ min-width:0; } /* مهم لمنع تمدد الأعمدة بسبب محتوى طويل */
+
 #purchase .co-left .card,
 #purchase .co-right .card{
   background:#0f1318;
@@ -1131,9 +1136,7 @@ input[type="submit"]:disabled {
 }
 
 /* ====== form ====== */
-#purchase .form{
-  display:block;
-}
+#purchase .form{ display:block; }
 #purchase .form-row{
   display:grid;
   grid-template-columns:140px minmax(0,1fr);
@@ -1209,6 +1212,7 @@ input[type="submit"]:disabled {
   background:#0f1318; border:1px solid #202a36; color:#e9edf3; font-weight:700; cursor:pointer;
   transition:filter .15s, transform .15s, border-color .15s;
   text-align:center;
+  min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 .pay-tab-btn:hover{ filter:brightness(1.06); border-color:#2a3442; transform:translateY(-1px); }
 .pay-tab-btn[aria-selected="true"]{
