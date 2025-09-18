@@ -260,7 +260,7 @@ async function loadProduct({ productId = null, slug = null } = {}) {
     const cats       = Array.isArray(p.categories) ? p.categories : [];
     const variations = Array.isArray(p.variations) ? p.variations : [];
     const variants   = Array.isArray(p.variants)   ? p.variants   : [];
-    const currency   = (p.custom_currency || p.currency || 'USD').toUpperCase();
+    const currency   = (p.custom_currency || p.currency || 'EUR').toUpperCase();
 
     // ---------- selection state ----------
     // selectedDisplay: يحتفظ بالنص الأصلي للعرض
