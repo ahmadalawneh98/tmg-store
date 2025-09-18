@@ -376,16 +376,20 @@ async function loadProduct({ productId = null, slug = null } = {}) {
         }
 
         // 2) dropdown
-       // 2) dropdown لكن بدون select
-if (type === 'dropdown' && props.length) {
-  const opts = props.map(pr => `
-    <option value="${pr.vval}" data-raw="${pr.value}">${pr.name}</option>
+       if (type === 'dropdown' && props.length) {
+  const opts = props.map((pr, idx) => `
+    <option value="${pr.vval}" data-raw="${pr.value}" ${idx === 0 ? 'selected' : ''}>
+      ${pr.name}
+    </option>
   `).join('');
+
   return `
-    <div class="var-block options">
+    <label class="var-block dropdown">
       <div class="var-title">${vRawName.trim()}</div>
-      ${opts}
-    </div>
+      <select class="var-select" data-vkey="${vKey}" data-vname="${vRawName}">
+        ${opts}
+      </select>
+    </label>
   `;
 }
 
