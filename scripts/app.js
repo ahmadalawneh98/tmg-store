@@ -791,9 +791,9 @@ window.addEventListener('popstate', async (e) => {
 
 // helper: أظهر/أخفِ الهيرو (.hero)
 function setHeroVisibility(show){
-  const hero = document.querySelector('.hero');
-  if (!hero) return;
-  hero.classList.toggle('is-hidden', !show);
+  const body = document.body;
+  // view-inner = صفحات داخلية (Product/Checkout/Categories فرعية)
+  body.classList.toggle('view-inner', !show);
 }
 
 function handleHashRoute() {

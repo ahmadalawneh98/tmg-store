@@ -1288,7 +1288,10 @@ input[type="submit"]:disabled {
   margin-top: 16px; /* عدل القيمة حسب الذوق (20px, 24px...) */
 }
 
+/* يظهر الهيرو افتراضياً */
+.hero { transition: opacity .25s ease; }
 
-.hero.is-hidden {
+/* أخفِ الهيرو في كل الصفحات الداخلية */
+.view-inner .hero { 
   display: none !important;
 }

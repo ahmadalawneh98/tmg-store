@@ -12,12 +12,20 @@
 
 </head>
 <body>
+<script>
+  (function () {
+    var h = location.hash || '';
+    if (/^#\/(product|checkout|categories\/)/.test(h)) {
+      document.body.classList.add('view-inner'); // اخفِ الهيرو فورًا
+    }
+  })();
+</script>
 
 <canvas id="bgParticles" aria-hidden="true"></canvas>
 
 <header class="nav">
   <div class="wrap">
-    <a class="brand" href="#">
+ <a class="brand" href="#/categories">
       <img src="Images/Logo.PNG" alt="TMG AMIR logo">
       <span>TMG&nbsp;AMIR</span>
     </a>
