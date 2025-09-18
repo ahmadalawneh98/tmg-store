@@ -1118,16 +1118,55 @@ document.getElementById('checkoutForm')?.addEventListener('submit', (e)=>{
 
 function showCheckout(draft = null) {
   const sec = document.getElementById('purchase');
-  const details = document.getElementById('productDetails'); // نفس اللي بتكتب فيه loadProduct
+  const details = document.getElementById('productDetails');
   if (!sec) return;
 
-  // أخفي تفاصيل المنتج، وافتح الدفع
   details?.classList.add('is-hidden');
   sec.classList.add('open');
   sec.removeAttribute('aria-hidden');
   sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-  if (draft) { try { sessionStorage.setItem('checkoutDraft', JSON.stringify(draft)); } catch {} }
+  if (draft) { 
+    try { sessionStorage.setItem('checkoutDraft', JSON.stringify(draft)); } catch {}
+    renderCheckoutSummaryFromDraft(draft); // <<=== الجديد
+  } else {
+    // لو ما وصل draft، جرّب من التخزين
+    try {
+      const d = JSON.parse(sessionStorage.getItem('checkoutDraft') || 'null');
+      if (d) renderCheckoutSummaryFromDraft(d);
+    } catch {}
+  }
+}
+
+
+function renderCheckoutSummaryFromDraft(draft){
+  const wrap = document.getElementById('sumItems'); 
+  if(!wrap || !draft) return;
+
+  const name = draft?.product?.name || 'Product';
+  const img  = draft?.product?.thumb || '';
+  const qty  = Number(draft.quantity || 1);
+  const price= Number(draft.price || 0);
+  const line = (qty*price).toFixed(2);
+  const opts = draft.selections 
+    ? Object.entries(draft.selections).map(([k,v])=>`${k}: ${v}`).join(' • ')
+    : '';
+
+  wrap.innerHTML = `
+    <div class="sum-item">
+      <img src="${img}" alt="${name}">
+      <div>
+        <h4>${name}</h4>
+        <div class="meta">${opts}</div>
+        <div class="meta">Qty: ${qty} × ${price.toFixed(2)}</div>
+      </div>
+      <div class="line">${line}</div>
+    </div>
+  `;
+
+  // المجموع والعملة من الـ draft
+  document.getElementById('sumTotal')?.textContent = line;
+  document.getElementById('sumCurr')?.textContent  = (draft.currency || 'EUR');
 }
 
 function hideCheckout() {
