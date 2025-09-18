@@ -376,23 +376,19 @@ async function loadProduct({ productId = null, slug = null } = {}) {
         }
 
         // 2) dropdown
-       if (type === 'dropdown' && props.length) {
-  const opts = props.map((pr, idx) => `
-    <option value="${pr.vval}" data-raw="${pr.value}" ${idx === 0 ? 'selected' : ''}>
-      ${pr.name}
-    </option>
-  `).join('');
-
-  return `
-    <label class="var-block dropdown">
-      <div class="var-title">${vRawName.trim()}</div>
-      <select class="var-select" data-vkey="${vKey}" data-vname="${vRawName}">
-        ${opts}
-      </select>
-    </label>
-  `;
-}
-
+        if (type === 'dropdown' && props.length) {
+          const opts = ['<option value="">— Select —</option>']
+            .concat(props.map(pr => `<option value="${pr.vval}" data-raw="${pr.value}">${pr.name}</option>`))
+            .join('');
+          return `
+            <label class="var-block dropdown">
+              <div class="var-title">${vRawName.trim()}</div>
+              <select class="var-select" data-vkey="${vKey}" data-vname="${vRawName}">
+                ${opts}
+              </select>
+            </label>
+          `;
+        }
 
         // 3) color swatches
         if (type === 'color' && props.length) {
