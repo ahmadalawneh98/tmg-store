@@ -376,19 +376,23 @@ async function loadProduct({ productId = null, slug = null } = {}) {
         }
 
         // 2) dropdown
-        if (type === 'dropdown' && props.length) {
-          const opts = ['<option value="">— Select —</option>']
-            .concat(props.map(pr => `<option value="${pr.vval}" data-raw="${pr.value}">${pr.name}</option>`))
-            .join('');
-          return `
-            <label class="var-block dropdown">
-              <div class="var-title">${vRawName.trim()}</div>
-              <select class="var-select" data-vkey="${vKey}" data-vname="${vRawName}">
-                ${opts}
-              </select>
-            </label>
-          `;
-        }
+       // 2) dropdown (عرض كأزرار بدل select)
+if (type === 'dropdown' && props.length) {
+  const btns = props.map(pr => `
+    <button type="button" class="var-btn"
+            data-vkey="${vKey}" data-vname="${vRawName}"
+            data-vval="${pr.vval}" data-raw="${pr.value}">
+      ${pr.name}
+    </button>
+  `).join('');
+  return `
+    <div class="var-block buttons">
+      <div class="var-title">${vRawName.trim()}</div>
+      <div class="var-options">${btns}</div>
+    </div>
+  `;
+}
+
 
         // 3) color swatches
         if (type === 'color' && props.length) {
