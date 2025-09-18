@@ -1283,3 +1283,7 @@ input[type="submit"]:disabled {
   #purchase .co-wrap{ grid-template-columns: 1fr; }
 }
 
+/* مسافة بين ملخص الطلب والفورم */
+#orderSummary .co-form {
+  margin-top: 16px; /* عدل القيمة حسب الذوق (20px, 24px...) */
+}
