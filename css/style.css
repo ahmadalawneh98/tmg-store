@@ -1282,3 +1282,15 @@ input[type="submit"]:disabled {
   }
   #purchase .co-wrap{ grid-template-columns: 1fr; }
 }
+
+@media (min-width: 901px){
+  #purchase .co-wrap{
+    grid-template-columns: 1fr;  /* عمود واحد */
+  }
+  #purchase .co-left{
+    order: 2;   /* خلي قسم الدفع ييجي بعد */
+  }
+  #purchase .co-right{
+    order: 1;   /* خلي ملخص الطلب يطلع أول */
+  }
+}
