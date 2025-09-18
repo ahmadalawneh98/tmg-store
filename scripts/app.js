@@ -210,7 +210,7 @@ function renderProducts(items = []) {
 /* ========= Product navigation & loading ========= */
 async function navigateToProduct(productId, slug) {
   history.pushState({ view: 'product', productId, slug }, '', `#/product/${slug || productId}`);
-  await loadProduct({ productId, slug });
+  handleHashRoute(); // ← سيخفي الهيرو ويستدعي loadProduct بالمنطق الموحد
 }
 
 
