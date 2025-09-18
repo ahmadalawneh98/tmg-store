@@ -595,15 +595,25 @@ if (buyBtn) buyBtn.textContent = 'Click here to buy';
         .filter(isStructured)
         .map(v => norm(v.name))
         .filter(k => !selected[k]);
+if (missing.length) {
+  const missingDisplay = variations
+    .filter(v => missing.includes(norm(v.name)))
+    .map(v => String(v.name).trim());
 
-      if (missing.length) {
-        // رجّع أسماء العرض بدل المفاتيح المطبّعة
-        const missingDisplay = variations
-          .filter(v => missing.includes(norm(v.name)))
-          .map(v => String(v.name).trim());
-        alert(`Please select: ${missingDisplay.join(', ')}`);
-        return;
-      }
+  if (window.Swal) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'Missing selections',
+      html: `Please select:<br><b>${missingDisplay.join(', ')}</b>`,
+      confirmButtonText: 'OK',
+      confirmButtonColor: '#ff6a00',
+    });
+  } else {
+    // سقوط احتياطي لو المكتبة ما لودّت لأي سبب
+    alert(`Please select: ${missingDisplay.join(', ')}`);
+  }
+  return;
+}
 
       const draft = buildDraft();
       try { sessionStorage.setItem('checkoutDraft', JSON.stringify(draft)); } catch {}
