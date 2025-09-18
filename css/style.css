@@ -1240,3 +1240,45 @@ input[type="submit"]:disabled {
   .pay-tabs-header{ flex-wrap:wrap; }
   #purchase .form-row{ grid-template-columns:1fr; }
 }
+
+/* ====== Center the whole purchase section with side gutters ====== */
+/* يحدّد عرضاً أقصى ويعمل حواف داخلية */
+#purchase.checkout,
+#purchase.checkout.card-xl {
+  /* العرض الأقصى للحاوية (عدّل الرقم حسب ذوقك) */
+  width: min(1200px, 92vw);
+  margin-inline: auto;        /* يوسّط الحاوية */
+  padding-inline: 16px;       /* مسافة يمين/يسار */
+}
+
+/* لو في أي parent عامله full-bleed، هذي تمنع التمدد */
+#purchase {
+  box-sizing: border-box;
+}
+
+/* خلي العمودين قد بعض */
+#purchase .co-wrap{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+/* مهم جداً حتى ما يكسروا الشبكة إذا المحتوى طويل */
+#purchase .co-left,
+#purchase .co-right{ min-width: 0; }
+
+/* اختياري: ثبّت ملخص الطلب أثناء التمرير */
+@media (min-width: 900px){
+  #purchase .co-right{ position: sticky; top: 16px; }
+}
+
+/* موبايل: عمود واحد وعرض مع حواف */
+@media (max-width: 900px){
+  #purchase.checkout,
+  #purchase.checkout.card-xl{
+    width: min(760px, 94vw);
+    padding-inline: 12px;
+  }
+  #purchase .co-wrap{ grid-template-columns: 1fr; }
+}
