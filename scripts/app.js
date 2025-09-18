@@ -318,17 +318,9 @@ async function loadProduct({ productId = null, slug = null } = {}) {
       return salePrice > 0 ? salePrice : basePrice;
     }
 
-    function stockLabel() {
-      if (selectedVariant) {
-        const q = Number(selectedVariant.quantity || 0);
-        return q > 0 ? 'Available' : 'Out of stock';
-      }
-      if (p.track_stock) {
-        const q = Number(p.quantity || 0);
-        return q > 0 ? 'Available' : 'Out of stock';
-      }
-      return 'Available';
-    }
+  function stockLabel() {
+  return 'Available'; // متجر رقمي: المنتج دائمًا متاح
+}
 
     // --------- render variations (respect API types) ---------
     function renderVariations() {
@@ -505,21 +497,32 @@ if (buyBtn) buyBtn.textContent = 'Click here to buy';
     });
 
     // ---------- price / stock ----------
-    function refreshMeta() {
-      selectedVariant = matchVariant();
-      const priceNode = box.querySelector('#pdPrice');
-      const stockNode = box.querySelector('#pdStock');
+   function refreshMeta() {
+  selectedVariant = matchVariant();
+  const priceNode = box.querySelector('#pdPrice');
+  const stockNode = box.querySelector('#pdStock');
 
-      if (!selectedVariant && salePrice > 0) {
-        priceNode.innerHTML = `<del>${basePrice.toFixed(2)} ${currency}</del> <strong>${salePrice.toFixed(2)} ${currency}</strong>`;
-      } else {
-        priceNode.innerHTML = `<strong>${currentPrice().toFixed(2)} ${currency}</strong>`;
-      }
-      stockNode.textContent = stockLabel();
+  // السعر
+  if (!selectedVariant && salePrice > 0) {
+    priceNode.innerHTML = `<del>${basePrice.toFixed(2)} ${currency}</del> <strong>${salePrice.toFixed(2)} ${currency}</strong>`;
+  } else {
+    priceNode.innerHTML = `<strong>${currentPrice().toFixed(2)} ${currency}</strong>`;
+  }
 
-      const buy = box.querySelector('#buyNowBtn');
-      buy.disabled = stockNode.textContent.toLowerCase().includes('out of stock');
-    }
+  // متجر رقمي: لا نستخدم المخزون نهائياً
+  if (stockNode) {
+    // إمّا تعرض "Available" دائمًا:
+    stockNode.textContent = 'Available';
+    // أو أخفِ السطر تمامًا:
+    // stockNode.style.display = 'none';
+  }
+
+  // الزر دائمًا مفعّل
+  const buy = box.querySelector('#buyNowBtn');
+  if (buy) buy.disabled = false;
+}
+
+
     refreshMeta();
 
     // ---------- variation events ----------
