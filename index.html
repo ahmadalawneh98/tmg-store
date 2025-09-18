@@ -124,61 +124,6 @@
   <div id="productDetails"></div>
 </section>
 
-<footer class="footer">
-  © <span id="y"></span> TMG AMIR. All rights reserved.
-</footer>
-
-<!-- ===== Templates (for future rendering) ===== -->
-<template id="categoryCardTpl">
-  <article class="card">
-    <div class="img"><img alt=""></div>
-    <div class="body">
-      <h3 class="title"></h3>
-    </div>
-    <span class="shine" aria-hidden="true"></span>
-  </article>
-</template>
-
-<template id="productCardTpl">
-  <article class="card tilt">
-    <div class="img"><img alt=""></div>
-    <div class="body">
-      <h3 class="title"></h3>
-      <div class="price"><span class="sym">€</span><span class="amount">0.00</span></div>
-      <div class="buy"><a class="btn primary" target="_blank" rel="noopener">Buy now</a></div>
-    </div>
-    <span class="shine" aria-hidden="true"></span>
-  </article>
-</template>
-
-
-<!-- Cart Drawer -->
-<div id="cartDrawer" class="cart-drawer" aria-hidden="true">
-  <div class="cart-overlay" data-close="drawer"></div>
-  <section class="cart-panel" role="dialog" aria-modal="true" aria-labelledby="cartTitle">
-    <header class="cart-header">
-      <h3 id="cartTitle">Your Cart</h3>
-      <button class="cart-close" data-close="drawer" aria-label="Close cart">×</button>
-    </header>
-
-    <div id="cartItems" class="cart-items"></div>
-
-    <footer class="cart-footer">
-      <div class="cart-total">
-        <span>Total</span>
-        <strong><span id="cartTotal">0.00</span> <span id="cartCurrency">USD</span></strong>
-      </div>
-      <div class="cart-footer-actions">
-        <button id="clearCart" class="btn subtle">Clear</button>
-        <button id="goCheckout" class="btn primary">Checkout</button>
-      </div>
-    </footer>
-  </section>
-</div>
-
-
-
-
 
 <!-- ============ Purchase Section ============ -->
 <section id="purchase" class="checkout card-xl">
@@ -315,6 +260,64 @@
     </aside>
   </div>
 </section>
+
+
+
+<footer class="footer">
+  © <span id="y"></span> TMG AMIR. All rights reserved.
+</footer>
+
+<!-- ===== Templates (for future rendering) ===== -->
+<template id="categoryCardTpl">
+  <article class="card">
+    <div class="img"><img alt=""></div>
+    <div class="body">
+      <h3 class="title"></h3>
+    </div>
+    <span class="shine" aria-hidden="true"></span>
+  </article>
+</template>
+
+<template id="productCardTpl">
+  <article class="card tilt">
+    <div class="img"><img alt=""></div>
+    <div class="body">
+      <h3 class="title"></h3>
+      <div class="price"><span class="sym">€</span><span class="amount">0.00</span></div>
+      <div class="buy"><a class="btn primary" target="_blank" rel="noopener">Buy now</a></div>
+    </div>
+    <span class="shine" aria-hidden="true"></span>
+  </article>
+</template>
+
+
+<!-- Cart Drawer -->
+<div id="cartDrawer" class="cart-drawer" aria-hidden="true">
+  <div class="cart-overlay" data-close="drawer"></div>
+  <section class="cart-panel" role="dialog" aria-modal="true" aria-labelledby="cartTitle">
+    <header class="cart-header">
+      <h3 id="cartTitle">Your Cart</h3>
+      <button class="cart-close" data-close="drawer" aria-label="Close cart">×</button>
+    </header>
+
+    <div id="cartItems" class="cart-items"></div>
+
+    <footer class="cart-footer">
+      <div class="cart-total">
+        <span>Total</span>
+        <strong><span id="cartTotal">0.00</span> <span id="cartCurrency">USD</span></strong>
+      </div>
+      <div class="cart-footer-actions">
+        <button id="clearCart" class="btn subtle">Clear</button>
+        <button id="goCheckout" class="btn primary">Checkout</button>
+      </div>
+    </footer>
+  </section>
+</div>
+
+
+
+
 
 
 <script type="module" src="/scripts/app.js"></script>
