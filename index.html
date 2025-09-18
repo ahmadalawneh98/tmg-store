@@ -128,7 +128,7 @@
 <!-- ============ Purchase Section ============ -->
 <section id="purchase" class="checkout card-xl">
   <div class="co-wrap">
-    <!-- LEFT: Payment Tabs + Form -->
+    <!-- LEFT: Payment Tabs ONLY -->
     <div class="co-left">
 
       <!-- Payment Tabs -->
@@ -216,9 +216,24 @@
 
         <span class="visually-hidden" aria-live="polite" id="payCopyLive"></span>
       </section>
+    </div>
 
-      <!-- Checkout Form -->
-      <form id="checkoutForm" class="co-form" autocomplete="on">
+    <!-- RIGHT: Order Summary + Checkout Form -->
+    <aside class="co-right" id="orderSummary">
+      <div class="summary card">
+        <h3 class="sum-title">Order Summary</h3>
+        <div class="sum-items" id="sumItems"></div>
+        <div class="sum-footer">
+          <div class="sum-line">
+            <span>Total</span>
+            <strong><span id="sumTotal">0.00</span> <span id="sumCurr">USD</span></strong>
+          </div>
+          <button class="btn" id="editCart">Edit cart</button>
+        </div>
+      </div>
+
+      <!-- Checkout Form moved here -->
+      <form id="checkoutForm" class="co-form card" autocomplete="on">
         <div class="co-title">Please fill your information</div>
 
         <div class="co-field">
@@ -245,18 +260,6 @@
           <button id="submitOrder" class="btn primary" type="submit">Buy now</button>
         </div>
       </form>
-    </div>
-
-    <!-- RIGHT: Order Summary -->
-    <aside class="co-right" id="orderSummary">
-      <div class="summary card">
-        <h3 class="sum-title">Order Summary</h3>
-        <div class="sum-items" id="sumItems"></div>
-        <div class="sum-footer">
-          <div class="sum-line"><span>Total</span><strong><span id="sumTotal">0.00</span> <span id="sumCurr">USD</span></strong></div>
-          <button class="btn" id="editCart">Edit cart</button>
-        </div>
-      </div>
     </aside>
   </div>
 </section>
