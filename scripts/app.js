@@ -451,41 +451,45 @@ async function loadProduct({ productId = null, slug = null } = {}) {
     }
 
     // ---------- page markup ----------
-    box.innerHTML = `
-      <article class="product-details card-xl">
-        <div class="pd-media">
-          <div class="pd-gallery">
-            ${gallery.map((src,i)=>`<img class="pd-img ${i===0?'active':''}" src="${src}" alt="${p.name || 'Product'} ${i+1}" />`).join('')}
-          </div>
-          ${gallery.length>1 ? `
-            <div class="pd-thumbs">
-              ${gallery.map((src,i)=>`<img class="pd-thumb ${i===0?'active':''}" src="${src}" data-index="${i}" alt="thumb ${i+1}" />`).join('')}
-            </div>` : ''}
-        </div>
+   box.innerHTML = `
+  <article class="product-details card-xl">
+    <div class="pd-media">
+      <div class="pd-gallery">
+        ${gallery.map((src,i)=>`<img class="pd-img ${i===0?'active':''}" src="${src}" alt="${p.name || 'Product'} ${i+1}" />`).join('')}
+      </div>
+      ${gallery.length>1 ? `
+        <div class="pd-thumbs">
+          ${gallery.map((src,i)=>`<img class="pd-thumb ${i===0?'active':''}" src="${src}" data-index="${i}" alt="thumb ${i+1}" />`).join('')}
+        </div>` : ''}
+    </div>
 
-        <div class="pd-body">
-          <h2>${p.name || 'Product'}</h2>
+    <div class="pd-body">
+      <h2>${p.name || 'Product'}</h2>
 
-          <div class="pd-meta">
-            <div class="pd-price" id="pdPrice"></div>
-            <div class="pd-stock" id="pdStock"></div>
-            ${p.is_free_shipping ? `<div class="pd-badge free-ship">Free Shipping</div>` : ''}
-          </div>
+      <div class="pd-meta">
+        <div class="pd-price" id="pdPrice"></div>
+        <div class="pd-stock" id="pdStock"></div>
+        ${p.is_free_shipping ? `<div class="pd-badge free-ship">Free Shipping</div>` : ''}
+      </div>
 
-          ${cats.length ? `<div class="pd-cats"><b>Categories:</b> ${cats.map(c=>c.name||c.slug||c.id).join(', ')}</div>` : ''}
+      ${cats.length ? `<div class="pd-cats"><b>Categories:</b> ${cats.map(c=>c.name||c.slug||c.id).join(', ')}</div>` : ''}
 
-          <div id="pdVarsWrap">${renderVariations()}</div>
+      <div id="pdVarsWrap">${renderVariations()}</div>
 
-          <div class="pd-actions">
-            <button id="buyNowBtn" class="btn primary">${p.buy_now_text || 'Click here to buy'}</button>
-            <button id="addToCartBtn" class="btn">Add to cart</button>
-          </div>
+      <div class="pd-actions">
+        <!-- دايمًا إنجليزي -->
+        <button id="buyNowBtn" class="btn primary">Click here to buy</button>
+        <button id="addToCartBtn" class="btn">Add to cart</button>
+      </div>
 
+      ${p.description ? `<div class="pd-desc">${p.description}</div>` : ''}
+    </div>
+  </article>
+`;
 
-          ${p.description ? `<div class="pd-desc">${p.description}</div>` : ''}
-        </div>
-      </article>
-    `;
+// بعد الحقن نضمن برضه النص:
+const buyBtn = box.querySelector('#buyNowBtn');
+if (buyBtn) buyBtn.textContent = 'Click here to buy';
 
     // ---------- gallery thumbs ----------
     const thumbs = box.querySelectorAll('.pd-thumb');
