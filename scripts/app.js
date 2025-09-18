@@ -1164,9 +1164,12 @@ function renderCheckoutSummaryFromDraft(draft){
     </div>
   `;
 
-  // المجموع والعملة من الـ draft
-  document.getElementById('sumTotal')?.textContent = line;
-  document.getElementById('sumCurr')?.textContent  = (draft.currency || 'EUR');
+  // ✅ صح: إسناد بعد فحص وجود العنصر
+  const sumTotalEl = document.getElementById('sumTotal');
+  if (sumTotalEl) sumTotalEl.textContent = line;
+
+  const sumCurrEl = document.getElementById('sumCurr');
+  if (sumCurrEl) sumCurrEl.textContent = (draft.currency || 'EUR');
 }
 
 function hideCheckout() {
