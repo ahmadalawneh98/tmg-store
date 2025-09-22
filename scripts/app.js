@@ -248,12 +248,8 @@ async function loadProduct({ productId = null, slug = null } = {}) {
     if (!p) { box.innerHTML = '<div class="error">Product not found</div>'; return; }
 
     // ---------- helpers: normalization (CRITICAL) ----------
-    const norm = (s) => String(s ?? '')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    const normMap = (obj) =>
-      Object.fromEntries(Object.entries(obj).map(([k,v]) => [norm(k), norm(v)]));
+    const norm = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
+    const normMap = (obj) => Object.fromEntries(Object.entries(obj).map(([k,v]) => [norm(k), norm(v)]));
 
     // ---------- normalize ----------
     const basePrice  = Number(p.price || 0);
@@ -265,8 +261,6 @@ async function loadProduct({ productId = null, slug = null } = {}) {
     const currency   = (p.custom_currency || p.currency || 'EUR').toUpperCase();
 
     // ---------- selection state ----------
-    // selectedDisplay: يحتفظ بالنص الأصلي للعرض
-    // selected: نسخة مُطبّعة للمطابقة
     const selectedDisplay = {};   // { rawName: rawValue }
     const selected        = {};   // { normName: normValue }
     let selectedVariant   = null;
@@ -289,15 +283,13 @@ async function loadProduct({ productId = null, slug = null } = {}) {
     function matchVariant() {
       if (!variations.length || !variants.length) return null;
 
-      // أسماء المتغيّرات المطلوبة (مطبّعة)
+      // أسماء المتغيّرات المطلوبة (مطبّعة) — فقط للـ structured لأنها هي اللي تبني variant
       const requiredKeys = variations
         .filter(isStructured)
         .map(v => norm(v.name));
 
-      // لازم نكون مختارين لكل structured
       if (requiredKeys.some(k => !selected[k])) return null;
 
-      // ابحث عن أول variant يطابق كل القيم المطلوبة بعد التطبيع
       for (const varItem of variants) {
         const props = Array.isArray(varItem.variation_props) ? varItem.variation_props : [];
         const ok = requiredKeys.every(k => {
@@ -320,17 +312,13 @@ async function loadProduct({ productId = null, slug = null } = {}) {
       return salePrice > 0 ? salePrice : basePrice;
     }
 
-  function stockLabel() {
-  return 'Available'; // متجر رقمي: المنتج دائمًا متاح
-}
-
     // --------- render variations (respect API types) ---------
     function renderVariations() {
       if (!variations.length) return '';
 
       const blocks = variations.map(v => {
         const vRawName = String(v.name || '');
-        const vKey     = norm(vRawName);                 // مفتاح موحّد
+        const vKey     = norm(vRawName);
         const type     = String(v.type || '').toLowerCase();
 
         const rawProps =
@@ -348,9 +336,7 @@ async function loadProduct({ productId = null, slug = null } = {}) {
 
         // 1) text-like -> real input/textarea
         if (treatAsText) {
-          // placeholder: خذه من أول prop إن وجد، وإلا من اسم الفاريشن
           const ph = props[0]?.name || props[0]?.value || vRawName || 'Enter value';
-          // نوع الإدخال حسب الاسم إذا لم يحدده الـ type:
           let inputType = 'text';
           const low = vRawName.toLowerCase();
           if (type === 'email' || low.includes('email')) inputType = 'email';
@@ -416,7 +402,6 @@ async function loadProduct({ productId = null, slug = null } = {}) {
           // set default selection once
           if (defaultVal != null && !selected[vKey]) {
             selected[vKey] = defaultVal;
-            // ابقِ نسخة العرض خام بدون trim
             const rawForDefault = rawProps.find(x => norm(x.value ?? x.name ?? '') === defaultVal);
             selectedDisplay[vRawName] = String(rawForDefault?.value ?? rawForDefault?.name ?? defaultVal);
           }
@@ -445,45 +430,44 @@ async function loadProduct({ productId = null, slug = null } = {}) {
     }
 
     // ---------- page markup ----------
-   box.innerHTML = `
-  <article class="product-details card-xl">
-    <div class="pd-media">
-      <div class="pd-gallery">
-        ${gallery.map((src,i)=>`<img class="pd-img ${i===0?'active':''}" src="${src}" alt="${p.name || 'Product'} ${i+1}" />`).join('')}
-      </div>
-      ${gallery.length>1 ? `
-        <div class="pd-thumbs">
-          ${gallery.map((src,i)=>`<img class="pd-thumb ${i===0?'active':''}" src="${src}" data-index="${i}" alt="thumb ${i+1}" />`).join('')}
-        </div>` : ''}
-    </div>
+    box.innerHTML = `
+      <article class="product-details card-xl">
+        <div class="pd-media">
+          <div class="pd-gallery">
+            ${gallery.map((src,i)=>`<img class="pd-img ${i===0?'active':''}" src="${src}" alt="${p.name || 'Product'} ${i+1}" />`).join('')}
+          </div>
+          ${gallery.length>1 ? `
+            <div class="pd-thumbs">
+              ${gallery.map((src,i)=>`<img class="pd-thumb ${i===0?'active':''}" src="${src}" data-index="${i}" alt="thumb ${i+1}" />`).join('')}
+            </div>` : ''}
+        </div>
 
-    <div class="pd-body">
-      <h2>${p.name || 'Product'}</h2>
+        <div class="pd-body">
+          <h2>${p.name || 'Product'}</h2>
 
-      <div class="pd-meta">
-        <div class="pd-price" id="pdPrice"></div>
-        <div class="pd-stock" id="pdStock"></div>
-        ${p.is_free_shipping ? `<div class="pd-badge free-ship">Free Shipping</div>` : ''}
-      </div>
+          <div class="pd-meta">
+            <div class="pd-price" id="pdPrice"></div>
+            <div class="pd-stock" id="pdStock"></div>
+            ${p.is_free_shipping ? `<div class="pd-badge free-ship">Free Shipping</div>` : ''}
+          </div>
 
-      ${cats.length ? `<div class="pd-cats"><b>Categories:</b> ${cats.map(c=>c.name||c.slug||c.id).join(', ')}</div>` : ''}
+          ${cats.length ? `<div class="pd-cats"><b>Categories:</b> ${cats.map(c=>c.name||c.slug||c.id).join(', ')}</div>` : ''}
 
-      <div id="pdVarsWrap">${renderVariations()}</div>
+          <div id="pdVarsWrap">${renderVariations()}</div>
 
-      <div class="pd-actions">
-        <!-- دايمًا إنجليزي -->
-        <button id="buyNowBtn" class="btn primary">Click here to buy</button>
-        <button id="addToCartBtn" class="btn">Add to cart</button>
-      </div>
+          <div class="pd-actions">
+            <button id="buyNowBtn" class="btn primary">Click here to buy</button>
+            <button id="addToCartBtn" class="btn">Add to cart</button>
+          </div>
 
-      ${p.description ? `<div class="pd-desc">${p.description}</div>` : ''}
-    </div>
-  </article>
-`;
+          ${p.description ? `<div class="pd-desc">${p.description}</div>` : ''}
+        </div>
+      </article>
+    `;
 
-// بعد الحقن نضمن برضه النص:
-const buyBtn = box.querySelector('#buyNowBtn');
-if (buyBtn) buyBtn.textContent = 'Click here to buy';
+    // تأكيد النص
+    const buyBtn = box.querySelector('#buyNowBtn');
+    if (buyBtn) buyBtn.textContent = 'Click here to buy';
 
     // ---------- gallery thumbs ----------
     const thumbs = box.querySelectorAll('.pd-thumb');
@@ -499,31 +483,24 @@ if (buyBtn) buyBtn.textContent = 'Click here to buy';
     });
 
     // ---------- price / stock ----------
-   function refreshMeta() {
-  selectedVariant = matchVariant();
-  const priceNode = box.querySelector('#pdPrice');
-  const stockNode = box.querySelector('#pdStock');
+    function refreshMeta() {
+      selectedVariant = matchVariant();
+      const priceNode = box.querySelector('#pdPrice');
+      const stockNode = box.querySelector('#pdStock');
 
-  // السعر
-  if (!selectedVariant && salePrice > 0) {
-    priceNode.innerHTML = `<del>${basePrice.toFixed(2)} ${currency}</del> <strong>${salePrice.toFixed(2)} ${currency}</strong>`;
-  } else {
-    priceNode.innerHTML = `<strong>${currentPrice().toFixed(2)} ${currency}</strong>`;
-  }
+      if (!selectedVariant && salePrice > 0) {
+        priceNode.innerHTML = `<del>${basePrice.toFixed(2)} ${currency}</del> <strong>${salePrice.toFixed(2)} ${currency}</strong>`;
+      } else {
+        priceNode.innerHTML = `<strong>${currentPrice().toFixed(2)} ${currency}</strong>`;
+      }
 
-  // متجر رقمي: لا نستخدم المخزون نهائياً
-  if (stockNode) {
-    // إمّا تعرض "Available" دائمًا:
-    stockNode.textContent = 'Available';
-    // أو أخفِ السطر تمامًا:
-    // stockNode.style.display = 'none';
-  }
+      if (stockNode) {
+        stockNode.textContent = 'Available'; // متجر رقمي
+      }
 
-  // الزر دائمًا مفعّل
-  const buy = box.querySelector('#buyNowBtn');
-  if (buy) buy.disabled = false;
-}
-
+      const buy = box.querySelector('#buyNowBtn');
+      if (buy) buy.disabled = false;
+    }
 
     refreshMeta();
 
@@ -569,6 +546,27 @@ if (buyBtn) buyBtn.textContent = 'Click here to buy';
       ['input','change','blur'].forEach(ev => inp.addEventListener(ev, apply));
     });
 
+    // ---------- helpers: إبراز الحقول الناقصة ----------
+    function highlightMissing(missingKeysNorm) {
+      const wrap = box.querySelector('#pdVarsWrap');
+      if (!wrap) return;
+
+      // امسح إبراز سابق
+      wrap.querySelectorAll('.var-block').forEach(b => b.classList.remove('is-missing'));
+
+      // فعّل إبراز جديد
+      variations.forEach(v => {
+        const keyNorm = norm(v.name);
+        if (missingKeysNorm.includes(keyNorm)) {
+          // ابحث عن كتلة هذا الفاريشن (حسب data-vname)
+          const block = wrap.querySelector(
+            `.var-block [data-vname]` // عنصر داخلي يحمل data-vname
+          )?.closest('.var-block');
+          if (block) block.classList.add('is-missing');
+        }
+      });
+    }
+
     // ---------- actions ----------
     const buildDraft = () => ({
       product: {
@@ -577,7 +575,7 @@ if (buyBtn) buyBtn.textContent = 'Click here to buy';
         name: p.name || '',
         thumb: p.thumb || (Array.isArray(p.images) ? p.images[0] : '')
       },
-      selections: { ...selectedDisplay }, // اعرض القيم كما هي
+      selections: { ...selectedDisplay },
       variant: selectedVariant ? {
         id: selectedVariant.id || null,
         taager_code: selectedVariant.taager_code || null,
@@ -591,52 +589,77 @@ if (buyBtn) buyBtn.textContent = 'Click here to buy';
       quantity: 1
     });
 
+    // دالة مشتركة للتحقق من إلزامية "كل" الفاريشنات
+    function getMissingAllVariations() {
+      // كل الأسماء المطبّعة
+      const requiredKeys = variations.map(v => norm(v.name));
+      // مفقود إذا ما في selected أو قيمة فارغة
+      const missing = requiredKeys.filter(k => !selected[k] || String(selected[k]).length === 0);
+      return missing;
+    }
+
     // Buy Now
     box.querySelector('#buyNowBtn')?.addEventListener('click', ()=>{
-      const missing = variations
-        .filter(isStructured)
-        .map(v => norm(v.name))
-        .filter(k => !selected[k]);
-if (missing.length) {
-  const missingDisplay = variations
-    .filter(v => missing.includes(norm(v.name)))
-    .map(v => String(v.name).trim());
+      const missing = getMissingAllVariations(); // ← كل الفاريشنات إلزامية
+      if (missing.length) {
+        highlightMissing(missing);
+        const missingDisplay = variations
+          .filter(v => missing.includes(norm(v.name)))
+          .map(v => String(v.name).trim());
 
-  if (window.Swal) {
-    Swal.fire({
-      icon: 'warning',
-      title: 'Missing selections',
-      html: `Please select:<br><b>${missingDisplay.join(', ')}</b>`,
-      confirmButtonText: 'OK',
-      confirmButtonColor: '#ff6a00',
-    });
-  } else {
-    // سقوط احتياطي لو المكتبة ما لودّت لأي سبب
-    alert(`Please select: ${missingDisplay.join(', ')}`);
-  }
-  return;
-}
+        if (window.Swal) {
+          Swal.fire({
+            icon: 'warning',
+            title: 'Missing selections',
+            html: `Please select:<br><b>${missingDisplay.join(', ')}</b>`,
+            confirmButtonText: 'OK',
+            confirmButtonColor: '#ff6a00',
+          });
+        } else {
+          alert(`Please select: ${missingDisplay.join(', ')}`);
+        }
+        return;
+      }
 
       const draft = buildDraft();
       try { sessionStorage.setItem('checkoutDraft', JSON.stringify(draft)); } catch {}
       history.pushState({ view: 'checkout', draft }, '', `#/checkout/${p.slug || (p.id || '')}`);
       showCheckout(draft);
-
     });
 
-    // Add to cart
-   // Add to cart (uses global cart helpers)
-box.querySelector('#addToCartBtn')?.addEventListener('click', ()=>{
-  const draft = buildDraft();
-  addToCart(draft, { open: true }); // يفتح درج السلة بعد الإضافة
-});
+    // Add to cart — نفس فحص الإلزام
+    box.querySelector('#addToCartBtn')?.addEventListener('click', ()=>{
+      const missing = getMissingAllVariations();
+      if (missing.length) {
+        highlightMissing(missing);
+        const missingDisplay = variations
+          .filter(v => missing.includes(norm(v.name)))
+          .map(v => String(v.name).trim());
 
+        if (window.Swal) {
+          Swal.fire({
+            icon: 'warning',
+            title: 'Missing selections',
+            html: `Please select:<br><b>${missingDisplay.join(', ')}</b>`,
+            confirmButtonText: 'OK',
+            confirmButtonColor: '#ff6a00',
+          });
+        } else {
+          alert(`Please select: ${missingDisplay.join(', ')}`);
+        }
+        return;
+      }
+
+      const draft = buildDraft();
+      addToCart(draft, { open: true });
+    });
 
   } catch (err) {
     console.error(err);
     box.innerHTML = '<div class="error">Error loading product</div>';
   }
 }
+
 
 
 /* ========= Products helpers ========= */
