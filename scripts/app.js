@@ -36,7 +36,7 @@ document.addEventListener('change', (e) => {
   } else {
     ta.disabled = true;
     ta.value = '';
-    ta.text = 'Not required';
+    ta.value  = 'Not required';
   }
 
   // خلّي منطقك الداخلي يتحدّث (listeners) إن وُجد
