@@ -1141,6 +1141,49 @@ document.getElementById('editCart')?.addEventListener('click', ()=>{
 
 // Submit order (placeholder: hook to your backend)
 // Replace the whole submit listener with this:
+// ضع رقمك هنا بصيغة دولية بدون + أو 00
+const WHATSAPP_NUMBER = '96279786041666';
+
+// helper: يبني نص رسالة واتساب
+function buildWhatsAppMessage(payload) {
+  const { customer, payment_method, items = [], status, notes } = payload;
+
+  // بنبني تفاصيل العناصر + إجمالي
+  let total = 0;
+  const lines = items.map((it, i) => {
+    const qty   = Number(it.quantity || 1);
+    const price = Number(it.price || 0);
+    const line  = qty * price;
+    total += line;
+    return `#${i+1}
+• Product ID: ${it.product_id ?? '-'}
+• Variant ID: ${it.variant_id ?? '-'}
+• Qty: ${qty}
+• Price: ${price.toFixed(2)} ${it.currency || ''}
+• Line: ${line.toFixed(2)} ${it.currency || ''}
+• Selections: ${it.selections ? JSON.stringify(it.selections) : '{}'}`;
+  }).join('\n\n');
+
+  return (
+`🧾 New Order
+——————————————
+👤 Customer
+• Name: ${customer?.name || '-'}
+• Phone: ${customer?.phone || '-'}
+• Instagram: ${customer?.instagram || '-'}
+
+💳 Payment: ${payment_method || '-'}
+📌 Status: ${status || 'pending'}
+📝 Notes: ${notes || '-'}
+
+📦 Items:
+${lines}
+
+——————————————
+💰 Total: ${total.toFixed(2)} ${(items[0]?.currency || 'EUR')}
+⏰ Time: ${new Date().toLocaleString()}` );
+}
+
 document.getElementById('checkoutForm')?.addEventListener('submit', async (e) => {
   e.preventDefault();
 
@@ -1148,17 +1191,16 @@ document.getElementById('checkoutForm')?.addEventListener('submit', async (e) =>
   const submitBtn = form.querySelector('[type="submit"]');
   if (submitBtn) submitBtn.disabled = true;
 
-  // helper: show a loading modal
-  const showLoading = (title = 'Submitting order…') =>
-    Swal?.fire({ title, allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+  const showLoading = (title = 'Preparing WhatsApp message…') =>
+    window.Swal?.fire({ title, allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
   try {
-    // 1) Form data + payment method
+    // 1) Form data + payment tab
     const data = Object.fromEntries(new FormData(form).entries());
     const activeTab = document.querySelector('.pay-tab-btn[aria-selected="true"]')?.id || '';
-    const payment_method = activeTab.replace('tabbtn-', ''); // paypal | uk | jo | other
+    const payment_method = activeTab.replace('tabbtn-',''); // paypal | uk | jo | other
 
-    // 2) Get items (from cart, else from checkoutDraft)
+    // 2) Get items (cart → draft)
     const cart = (typeof getCart === 'function') ? getCart() : [];
     let items = [];
 
@@ -1180,7 +1222,7 @@ document.getElementById('checkoutForm')?.addEventListener('submit', async (e) =>
         } else {
           alert('Your cart is empty.');
         }
-        if (submitBtn) submitBtn.disabled = false;
+        submitBtn && (submitBtn.disabled = false);
         return;
       }
       items = [{
@@ -1193,7 +1235,7 @@ document.getElementById('checkoutForm')?.addEventListener('submit', async (e) =>
       }];
     }
 
-    // 3) Build payload
+    // 3) Build payload (نفس الشكل السابق تقريبًا)
     const orderPayload = {
       customer: {
         name: data.name || '',
@@ -1206,49 +1248,27 @@ document.getElementById('checkoutForm')?.addEventListener('submit', async (e) =>
       status: 'pending'
     };
 
-    // 4) Send to backend
+    // 4) جهّز رسالة الواتساب وافتحها
     showLoading();
-    const res = await fetch('/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(orderPayload)
-    });
-    const result = await res.json();
+    const msg = buildWhatsAppMessage(orderPayload);
+    const waURL = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
 
-    // 5) Handle response
-    if (!res.ok) {
-      console.error('Order API error:', result);
-      if (window.Swal) {
-        await Swal.fire({
-          icon: 'error',
-          title: 'Order failed',
-          text: result?.message || 'Failed to create order. Please try again.'
-        });
-      } else {
-        alert('Failed to create order. Please try again.');
-      }
-      if (submitBtn) submitBtn.disabled = false;
-      return;
-    }
-
-    const oid = result?.id || result?.data?.id || '(no id)';
-
-    // Clear cart & draft
+    // فضّي السلة محليًا (اختياري)
     if (typeof setCart === 'function') setCart([]);
     sessionStorage.removeItem('checkoutDraft');
 
+    // افتح واتساب في تبويب جديد
+    if (window.Swal?.isLoading()) Swal.close();
+    window.open(waURL, '_blank');
+
+    // Optionally: أظهر نجاح سريع
     if (window.Swal) {
       await Swal.fire({
         icon: 'success',
-        title: 'Order created',
-        html: `Your order ID: <b>${oid}</b>`
+        title: 'Opening WhatsApp…',
+        text: 'Send the pre-filled order message to confirm.'
       });
-    } else {
-      alert(`✅ Order created successfully! ID: ${oid}`);
     }
-
-    // Optional redirect:
-    // location.hash = `#/order/${oid}`;
 
   } catch (err) {
     console.error(err);
@@ -1258,7 +1278,6 @@ document.getElementById('checkoutForm')?.addEventListener('submit', async (e) =>
       alert('Unexpected error while creating your order.');
     }
   } finally {
-    if (Swal?.isLoading()) Swal.close();
     if (submitBtn) submitBtn.disabled = false;
   }
 });
