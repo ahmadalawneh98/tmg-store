@@ -1142,7 +1142,7 @@ document.getElementById('editCart')?.addEventListener('click', ()=>{
 // Submit order (placeholder: hook to your backend)
 // Replace the whole submit listener with this:
 // ضع رقمك هنا بصيغة دولية بدون + أو 00
-const WHATSAPP_NUMBER = '96278604666';
+const WHATSAPP_NUMBER = '962786041666';
 
 // helper: يبني نص رسالة واتساب
 function buildWhatsAppMessage(payload) {
