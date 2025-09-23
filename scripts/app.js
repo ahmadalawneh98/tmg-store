@@ -1140,15 +1140,85 @@ document.getElementById('editCart')?.addEventListener('click', ()=>{
 });
 
 // Submit order (placeholder: hook to your backend)
-document.getElementById('checkoutForm')?.addEventListener('submit', (e)=>{
+document.getElementById('checkoutForm')?.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const data = Object.fromEntries(new FormData(e.currentTarget).entries());
-  // Attach cart + selected payment tab
-  const activeTab = document.querySelector('.pay-tab-btn[aria-selected="true"]')?.id || '';
-  data.payment_method = activeTab.replace('tabbtn-',''); // paypal/uk/jo/other
-  data.cart = (typeof getCart === 'function') ? getCart() : [];
-  // TODO: send to your API
-  alert('Order captured (wire this to your API).');
+
+  const form = e.currentTarget;
+  const submitBtn = form.querySelector('[type="submit"]');
+  submitBtn && (submitBtn.disabled = true);
+
+  try {
+    // 1) بيانات الفورم
+    const data = Object.fromEntries(new FormData(form).entries());
+    const activeTab = document.querySelector('.pay-tab-btn[aria-selected="true"]')?.id || '';
+    const payment_method = activeTab.replace('tabbtn-',''); // paypal / uk / jo / other
+
+    // 2) الكارت
+    const cart = (typeof getCart === 'function') ? getCart() : [];
+    if (!cart.length) {
+      alert('Your cart is empty.');
+      submitBtn && (submitBtn.disabled = false);
+      return;
+    }
+
+    // 3) تحويل عناصر الكارت إلى items مفهومة لـ EasyOrders
+    const items = cart.map(line => ({
+      product_id: line?.product?.id || null,
+      variant_id: line?.variant?.id || null,
+      quantity: Number(line?.quantity || 1),
+      price: Number(line?.price || 0),          // اختياري
+      currency: line?.currency || 'EUR',        // اختياري
+      selections: line?.selections || {}        // ميتا مفيدة لك
+    }));
+
+    // 4) بناء الـ payload النهائي (عدّل الأسماء حسب حقولك)
+    const orderPayload = {
+      // لو عندك customer_id ثابت/ديناميكي ضيفه هنا
+      customer: {
+        name: data.name || '',
+        phone: data.phone || '',
+        instagram: data.instagram || ''
+      },
+      notes: data.transfer_number ? `Transfer Number: ${data.transfer_number}` : '',
+      payment_method,              // paypal | uk | jo | other ...
+      items,                       // العناصر
+      status: 'pending'            // عدّل إذا بدك
+      // بإمكانك تضيف address, country, city, coupon, وغيرها حسب حاجتك
+    };
+
+    // 5) نرسل الطلب لباك إندك -> وهو يكلّم EasyOrders
+    const res = await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(orderPayload)
+    });
+
+    const result = await res.json();
+
+    if (!res.ok) {
+      console.error('Order API error:', result);
+      alert('Failed to create order. Please try again.');
+      submitBtn && (submitBtn.disabled = false);
+      return;
+    }
+
+    // 6) نجاح
+    // EasyOrders عادة يرجّع id للطلب
+    const oid = result?.id || result?.data?.id || '(no id)';
+    alert(`✅ Order created successfully! ID: ${oid}`);
+
+    // فضّي الكارت بعد النجاح
+    if (typeof setCart === 'function') setCart([]);
+
+    // (اختياري) روح لصفحة تأكيد
+    // location.href = `#/order/${oid}`;
+
+  } catch (err) {
+    console.error(err);
+    alert('Unexpected error while creating your order.');
+  } finally {
+    submitBtn && (submitBtn.disabled = false);
+  }
 });
 
 function showCheckout(draft = null) {
