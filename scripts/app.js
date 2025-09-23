@@ -1140,84 +1140,126 @@ document.getElementById('editCart')?.addEventListener('click', ()=>{
 });
 
 // Submit order (placeholder: hook to your backend)
+// Replace the whole submit listener with this:
 document.getElementById('checkoutForm')?.addEventListener('submit', async (e) => {
   e.preventDefault();
 
   const form = e.currentTarget;
   const submitBtn = form.querySelector('[type="submit"]');
-  submitBtn && (submitBtn.disabled = true);
+  if (submitBtn) submitBtn.disabled = true;
+
+  // helper: show a loading modal
+  const showLoading = (title = 'Submitting order…') =>
+    Swal?.fire({ title, allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
   try {
-    // 1) بيانات الفورم
+    // 1) Form data + payment method
     const data = Object.fromEntries(new FormData(form).entries());
     const activeTab = document.querySelector('.pay-tab-btn[aria-selected="true"]')?.id || '';
-    const payment_method = activeTab.replace('tabbtn-',''); // paypal / uk / jo / other
+    const payment_method = activeTab.replace('tabbtn-', ''); // paypal | uk | jo | other
 
-    // 2) الكارت
+    // 2) Get items (from cart, else from checkoutDraft)
     const cart = (typeof getCart === 'function') ? getCart() : [];
-    if (!cart.length) {
-      alert('Your cart is empty.');
-      submitBtn && (submitBtn.disabled = false);
-      return;
+    let items = [];
+
+    if (cart.length) {
+      items = cart.map(line => ({
+        product_id: line?.product?.id || null,
+        variant_id: line?.variant?.id || null,
+        quantity: Number(line?.quantity || 1),
+        price: Number(line?.price || 0),
+        currency: line?.currency || 'EUR',
+        selections: line?.selections || {}
+      }));
+    } else {
+      let draft = null;
+      try { draft = JSON.parse(sessionStorage.getItem('checkoutDraft') || 'null'); } catch {}
+      if (!draft) {
+        if (window.Swal) {
+          await Swal.fire({ icon: 'info', title: 'Your cart is empty', text: 'Please add a product first.' });
+        } else {
+          alert('Your cart is empty.');
+        }
+        if (submitBtn) submitBtn.disabled = false;
+        return;
+      }
+      items = [{
+        product_id: draft?.product?.id || null,
+        variant_id: draft?.variant?.id || null,
+        quantity: Number(draft?.quantity || 1),
+        price: Number(draft?.price || 0),
+        currency: draft?.currency || 'EUR',
+        selections: draft?.selections || {}
+      }];
     }
 
-    // 3) تحويل عناصر الكارت إلى items مفهومة لـ EasyOrders
-    const items = cart.map(line => ({
-      product_id: line?.product?.id || null,
-      variant_id: line?.variant?.id || null,
-      quantity: Number(line?.quantity || 1),
-      price: Number(line?.price || 0),          // اختياري
-      currency: line?.currency || 'EUR',        // اختياري
-      selections: line?.selections || {}        // ميتا مفيدة لك
-    }));
-
-    // 4) بناء الـ payload النهائي (عدّل الأسماء حسب حقولك)
+    // 3) Build payload
     const orderPayload = {
-      // لو عندك customer_id ثابت/ديناميكي ضيفه هنا
       customer: {
         name: data.name || '',
         phone: data.phone || '',
         instagram: data.instagram || ''
       },
       notes: data.transfer_number ? `Transfer Number: ${data.transfer_number}` : '',
-      payment_method,              // paypal | uk | jo | other ...
-      items,                       // العناصر
-      status: 'pending'            // عدّل إذا بدك
-      // بإمكانك تضيف address, country, city, coupon, وغيرها حسب حاجتك
+      payment_method,
+      items,
+      status: 'pending'
     };
 
-    // 5) نرسل الطلب لباك إندك -> وهو يكلّم EasyOrders
+    // 4) Send to backend
+    showLoading();
     const res = await fetch('/api/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(orderPayload)
     });
-
     const result = await res.json();
 
+    // 5) Handle response
     if (!res.ok) {
       console.error('Order API error:', result);
-      alert('Failed to create order. Please try again.');
-      submitBtn && (submitBtn.disabled = false);
+      if (window.Swal) {
+        await Swal.fire({
+          icon: 'error',
+          title: 'Order failed',
+          text: result?.message || 'Failed to create order. Please try again.'
+        });
+      } else {
+        alert('Failed to create order. Please try again.');
+      }
+      if (submitBtn) submitBtn.disabled = false;
       return;
     }
 
-    // 6) نجاح
-    // EasyOrders عادة يرجّع id للطلب
     const oid = result?.id || result?.data?.id || '(no id)';
-    alert(`✅ Order created successfully! ID: ${oid}`);
 
-    // فضّي الكارت بعد النجاح
+    // Clear cart & draft
     if (typeof setCart === 'function') setCart([]);
+    sessionStorage.removeItem('checkoutDraft');
 
-    // (اختياري) روح لصفحة تأكيد
-    // location.href = `#/order/${oid}`;
+    if (window.Swal) {
+      await Swal.fire({
+        icon: 'success',
+        title: 'Order created',
+        html: `Your order ID: <b>${oid}</b>`
+      });
+    } else {
+      alert(`✅ Order created successfully! ID: ${oid}`);
+    }
+
+    // Optional redirect:
+    // location.hash = `#/order/${oid}`;
 
   } catch (err) {
     console.error(err);
-    alert('Unexpected error while creating your order.');
+    if (window.Swal) {
+      await Swal.fire({ icon: 'error', title: 'Unexpected error', text: 'Please try again later.' });
+    } else {
+      alert('Unexpected error while creating your order.');
+    }
   } finally {
-    submitBtn && (submitBtn.disabled = false);
+    if (Swal?.isLoading()) Swal.close();
+    if (submitBtn) submitBtn.disabled = false;
   }
 });
 
