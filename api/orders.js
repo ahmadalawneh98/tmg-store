@@ -1,18 +1,17 @@
-// /api/orders.js — robust + env fallbacks + safe parsing
+// /api/orders.js — single-read parsing + env fallbacks
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
   }
 
   try {
-    // ✅ استخدم أي اسم متوفر من المتغيرات
+    // استخدم أي اسم متاح للمفتاح + المسار الصحيح
     const API_BASE =
       process.env.EASYORDERS_BASE ||
-      'https://api.easy-orders.net/api/v1/external-apps'; // external-apps مهم
-
+      'https://api.easy-orders.net/api/v1/external-apps';
     const API_KEY =
-      process.env.EASYORDERS_API_KEY ||  // بدون underscore
-      process.env.EASY_ORDERS_API_KEY;   // مع underscore (الموجود عندك)
+      process.env.EASYORDERS_API_KEY ||        // بدون underscore
+      process.env.EASY_ORDERS_API_KEY;         // مع underscore
 
     if (!API_KEY) {
       return res.status(500).json({
@@ -33,14 +32,10 @@ export default async function handler(req, res) {
       body: JSON.stringify(orderData),
     });
 
-    // ✅ جرّب تقرأ JSON، ولو فشل اقرأ نص
-    let payload, text;
-    try {
-      payload = await r.json();
-    } catch {
-      text = await r.text();
-      try { payload = JSON.parse(text); } catch { payload = { raw: text }; }
-    }
+    // ✅ اقرأ مرة واحدة كنص، ثم حاول JSON.parse
+    const text = await r.text();
+    let payload;
+    try { payload = JSON.parse(text); } catch { payload = { raw: text }; }
 
     if (!r.ok) {
       return res.status(r.status).json({
