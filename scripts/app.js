@@ -1407,7 +1407,7 @@ const searchResults = document.getElementById('searchResults');
 let searchTimeout = null;
 
 async function liveSearch(query) {
-  if (!query || query.length < 2) {
+  if (!query || query.length < 1) {
     searchResults.style.display = 'none';
     searchResults.innerHTML = '';
     return;
