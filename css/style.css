@@ -1300,3 +1300,44 @@ input[type="submit"]:disabled {
 .view-inner .hero { 
   display: none !important;
 }
+
+
+
+.search-box {
+  display: flex;
+  align-items: center;
+  background: var(--card);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 4px 10px;
+  margin: 0 1rem;
+}
+
+.search-box input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 14px;
+  width: 160px;
+}
+
+.search-box input::placeholder {
+  color: var(--muted);
+}
+
+.search-box button {
+  background: none;
+  border: none;
+  color: var(--brand);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding-left: 6px;
+  transition: color 0.2s ease;
+}
+
+.search-box button:hover {
+  color: var(--brand2);
+}
