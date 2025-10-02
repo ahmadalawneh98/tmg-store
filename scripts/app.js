@@ -1478,3 +1478,46 @@ document.addEventListener('click', (e) => {
 });
 
 
+
+function typeWriter(element, text, speed = 60, callback = null) {
+  element.textContent = ""; // ابدأ فاضي
+  let i = 0;
+
+  function typing() {
+    if (i < text.length) {
+      element.textContent += text.charAt(i);
+      i++;
+      setTimeout(typing, speed);
+    } else if (callback) {
+      callback();
+    }
+  }
+
+  typing();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const titleEl = document.querySelector(".typewriter-title");
+  const textEl = document.querySelector(".typewriter-text");
+
+  const titleText = titleEl.textContent.trim();
+  const textText = textEl.textContent.trim();
+
+  // احذف النصوص الأصلية
+  titleEl.textContent = "";
+  textEl.textContent = "";
+
+  // أضف مؤشر وهمي
+  const cursor = document.createElement("span");
+  cursor.classList.add("typewriter-cursor");
+  titleEl.after(cursor);
+
+  // ابدأ الكتابة
+  typeWriter(titleEl, titleText, 70, () => {
+    // بعد ما يخلص العنوان → الوصف
+    typeWriter(textEl, textText, 30, () => {
+      // بعد ما يخلص الوصف → أخفي المؤشر
+      cursor.remove();
+    });
+  });
+});
