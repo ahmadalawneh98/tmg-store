@@ -1399,3 +1399,82 @@ searchForm?.addEventListener('submit', (e) => {
   const q = (searchInput.value || '').trim();
   if (q) searchProducts(q);
 });
+
+
+const searchBox     = document.getElementById('searchForm');
+const searchInputEl = document.getElementById('searchInput');
+const searchResults = document.getElementById('searchResults');
+let searchTimeout = null;
+
+async function liveSearch(query) {
+  if (!query || query.length < 2) {
+    searchResults.style.display = 'none';
+    searchResults.innerHTML = '';
+    return;
+  }
+
+  try {
+    // API call (استعمل نفس الـ backend تبعك)
+    const url = new URL('/api/products', location.origin);
+    url.searchParams.set('search', query);
+    url.searchParams.set('limit', 8);
+
+    const r = await fetch(url.toString());
+    if (!r.ok) throw new Error(await r.text());
+    const j = await r.json();
+    const raw = Array.isArray(j) ? j : (j?.data ?? []);
+    const items = mapProducts(raw);
+
+    if (!items.length) {
+      searchResults.innerHTML = `<div class="item"><div class="info"><div class="title">No results</div></div></div>`;
+    } else {
+      searchResults.innerHTML = items.map(it => `
+        <div class="item" data-id="${it.id}" data-slug="${it.slug}">
+          <img src="${it.image}" alt="${it.title}">
+          <div class="info">
+            <div class="title">${it.title}</div>
+      <div class="price">${it.price.toFixed(2)} EUR</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    searchResults.style.display = 'block';
+
+  } catch (err) {
+    console.error('Live search error:', err);
+    searchResults.innerHTML = `<div class="item"><div class="info"><div class="title">Error loading</div></div></div>`;
+    searchResults.style.display = 'block';
+  }
+}
+
+// input listener مع delay (debounce)
+searchInputEl?.addEventListener('input', () => {
+  clearTimeout(searchTimeout);
+  const q = searchInputEl.value.trim();
+  searchTimeout = setTimeout(() => liveSearch(q), 300);
+});
+
+// click on result
+searchResults?.addEventListener('click', (e) => {
+  const item = e.target.closest('.item');
+  if (!item) return;
+  const id   = item.dataset.id;
+  const slug = item.dataset.slug;
+
+  searchResults.style.display = 'none';
+  searchInputEl.value = '';
+
+  if (id || slug) {
+    navigateToProduct(id, slug);
+  }
+});
+
+// إغلاق القائمة عند الضغط خارجها
+document.addEventListener('click', (e) => {
+  if (!searchBox.contains(e.target)) {
+    searchResults.style.display = 'none';
+  }
+});
+
+

@@ -1341,3 +1341,53 @@ input[type="submit"]:disabled {
 .search-box button:hover {
   color: var(--brand2);
 }
+
+
+.search-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--card);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  max-height: 300px;
+  overflow-y: auto;
+  display: none;
+  z-index: 1000;
+}
+
+.search-results .item {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.search-results .item:hover {
+  background: var(--glass);
+}
+
+.search-results img {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 6px;
+  margin-right: 10px;
+}
+
+.search-results .info {
+  flex: 1;
+}
+
+.search-results .title {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.search-results .price {
+  font-size: 12px;
+  color: var(--brand2);
+}
