@@ -806,6 +806,12 @@ window.addEventListener('popstate', async (e) => {
     return;
   }
 
+  // ✅ handle search state
+  if (state.search) {
+    await searchProducts(state.search);
+    return;
+  }
+
   const parentId = state.parentId ?? null;
   setBackVisibility(parentId);
   showView('list');
@@ -1347,3 +1353,49 @@ function hideCheckout() {
   sec.setAttribute('aria-hidden', 'true');
   details?.classList.remove('is-hidden'); // رجّع تفاصيل المنتج
 }
+
+
+/* ========= Search Logic ========= */
+const searchForm  = document.getElementById('searchForm');
+const searchInput = document.getElementById('searchInput');
+
+async function searchProducts(query) {
+  const grid = document.getElementById('productsGrid');
+  if (!grid) return;
+  grid.innerHTML = '<div class="loading">Searching…</div>';
+
+  try {
+    // Call backend API with filter (EasyOrders style)
+    const url = new URL('/api/products', location.origin);
+    url.searchParams.set('search', query);
+    url.searchParams.set('limit', 50);
+
+    const r = await fetch(url.toString());
+    if (!r.ok) throw new Error(await r.text());
+
+    const j = await r.json();
+    const raw = Array.isArray(j) ? j : (j?.data ?? []);
+    const items = mapProducts(raw);
+
+    if (items.length === 0) {
+      grid.innerHTML = `<div class="no-products">No results found for "<b>${query}</b>"</div>`;
+    } else {
+      renderProducts(items);
+    }
+
+    // Show list view instead of product page
+    showView('list');
+    setHeroVisibility(false);
+    history.pushState({ search: query }, '', `#/search/${encodeURIComponent(query)}`);
+
+  } catch (err) {
+    console.error('Search error:', err);
+    grid.innerHTML = '<div class="error">Error while searching</div>';
+  }
+}
+
+searchForm?.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const q = (searchInput.value || '').trim();
+  if (q) searchProducts(q);
+});
