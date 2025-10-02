@@ -1029,6 +1029,11 @@ img { max-width: 100%; height: auto; }
   background: rgba(255,106,0,.18); border: 1px solid rgba(255,106,0,.5); color: #fff;
 }
 
+.cart-btn svg {
+  stroke: #fff;
+  fill: none;
+}
+
 /* ==== Cart drawer ==== */
 .cart-drawer { position: fixed; inset: 0; z-index: 9999; display: none; }
 .cart-drawer.open { display: block; }
