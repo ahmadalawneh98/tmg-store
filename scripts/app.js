@@ -1154,41 +1154,49 @@ const WHATSAPP_NUMBER = '962786041666';
 function buildWhatsAppMessage(payload) {
   const { customer, payment_method, items = [], status, notes } = payload;
 
-  // بنبني تفاصيل العناصر + إجمالي
   let total = 0;
+
   const lines = items.map((it, i) => {
     const qty   = Number(it.quantity || 1);
     const price = Number(it.price || 0);
     const line  = qty * price;
     total += line;
-    return `#${i+1}
-• Product ID: ${it.product_id ?? '-'}
-• Variant ID: ${it.variant_id ?? '-'}
-• Qty: ${qty}
-• Price: ${price.toFixed(2)} ${it.currency || ''}
-• Line: ${line.toFixed(2)} ${it.currency || ''}
-• Selections: ${it.selections ? JSON.stringify(it.selections) : '{}'}`;
+
+    // عرض الخيارات بشكل منسق
+    let selectionsText = '';
+    if (it.selections && Object.keys(it.selections).length) {
+      selectionsText = Object.entries(it.selections)
+        .map(([k, v]) => `• ${k.trim()}: ${v}`)
+        .join('\n');
+    }
+
+    return `#${i + 1}️⃣  ${it.product_name || 'Product'}
+${selectionsText}
+📦 الكمية: ${qty}
+💰 السعر: ${price.toFixed(2)} ${it.currency || ''}
+💵 الإجمالي: ${line.toFixed(2)} ${it.currency || ''}`;
   }).join('\n\n');
 
   return (
-`🧾 New Order
+`🧾 *طلب جديد*
 ——————————————
-👤 Customer
-• Name: ${customer?.name || '-'}
-• Phone: ${customer?.phone || '-'}
-• Instagram: ${customer?.instagram || '-'}
+👤 *العميل*
+• الاسم: ${customer?.name || '-'}
+• الهاتف: ${customer?.phone || '-'}
+• إنستغرام: ${customer?.instagram || '-'}
 
-💳 Payment: ${payment_method || '-'}
-📌 Status: ${status || 'pending'}
-📝 Notes: ${notes || '-'}
+💳 *طريقة الدفع:* ${payment_method || '-'}
+📌 *الحالة:* ${status || 'قيد المعالجة'}
+📝 *ملاحظات:* ${notes || '-'}
 
-📦 Items:
+——————————————
 ${lines}
 
 ——————————————
-💰 Total: ${total.toFixed(2)} ${(items[0]?.currency || 'EUR')}
-⏰ Time: ${new Date().toLocaleString()}` );
+💰 *الإجمالي:* ${total.toFixed(2)} ${(items[0]?.currency || 'EUR')}
+⏰ *الوقت:* ${new Date().toLocaleString()}`)
 }
+
 
 document.getElementById('checkoutForm')?.addEventListener('submit', async (e) => {
   e.preventDefault();
