@@ -1181,13 +1181,12 @@ ${selectionsText}
 `🧾 *طلب جديد*
 ——————————————
 👤 *العميل*
-• الاسم: ${customer?.name || '-'}
+• الاسم: ${customer?.full_name || '-'}
 • الهاتف: ${customer?.phone || '-'}
-• إنستغرام: ${customer?.instagram || '-'}
-
+• إنستغرام: ${customer?.insta || '-'}
 💳 *طريقة الدفع:* ${payment_method || '-'}
 📌 *الحالة:* ${status || 'قيد المعالجة'}
-📝 *ملاحظات:* ${notes || '-'}
+📝 *رقم التحويل:* ${notes || '-'}
 
 ——————————————
 ${lines}
